@@ -152,4 +152,3 @@ class SlateMaker(gui.QAction):
         hcore.events.unregisterInterest("kShowContextMenu/kTimeline",
                 self.eventHandler)
 
-slateMaker = SlateMaker()
