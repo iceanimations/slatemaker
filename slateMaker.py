@@ -25,6 +25,7 @@ class SlateMaker(gui.QAction):
             ( 'Version'    , '', 50, 1100, 618, 800, 60 ),
             ( 'Shot'       , '', 50, 1100, 750, 800, 60 ),
             ]
+    standardResolution = (2048, 1152)
 
     def __init__(self):
         ''' initialize Slate Maker Action'''
@@ -104,19 +105,28 @@ class SlateMaker(gui.QAction):
     @staticmethod
     def modifyTextEffect(text2, data):
         text2.setName(data[0])
+        format = text2.sequence().format()
+        xRes = format.width()
+        yRes = format.height()
 
         node = text2.node()
         node.knob('font_size').setValue(data[2])
         node.knob('message').setValue(data[1])
 
+        scale = xRes / float(SlateMaker.standardResolution[0])
+        xPos  = round( data[3] * scale )
+        yDiff = round( scale * ( data[4] - SlateMaker.standardResolution[1]/2 ) )
+        yPos  = yRes/2 + yDiff
+        font_size = round(data[2] * scale)
+
         box = node.knob('box')
-        box.setX(data[3])
-        box.setY(data[4])
-        box.setR(data[3]+data[5])
-        box.setT(data[4]+data[6])
+        box.setX(xPos)
+        box.setY(yPos)
+        box.setR(xPos+data[5]*scale)
+        box.setT(yPos+data[6]*scale)
 
         font_size = reduce( lambda l,n:l+list(n),
-                zip(range(256),[data[2]]*256), [])
+                zip(range(256),[font_size]*256), [])
         node.knob('font_size_values').resize(len(font_size), 1)
         node.knob('font_size_values').setValue(font_size)
 
