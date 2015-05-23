@@ -13,10 +13,10 @@ class SlateMaker(gui.QAction):
     deleteExistingEffects = False
     doExpandHandles = True
     overlayTexts = [
-            ('ForReview', 'For Review', 70, 816, 1060, 362, 74),
-            ('FrameNumber', 'Frame [metadata input/frame]', 60, 1653, 27, 362,
+            ('ForReview', 'For Review', 50, 816, 1060, 362, 74),
+            ('FrameNumber', 'Frame [metadata input/frame]', 50, 1653, 27, 362,
                 72),
-            ('ShotName', '[metadata hiero/clip]', 60, 15, 20, 971, 72), ]
+            ('ShotName', '[metadata hiero/clip]', 50, 15, 20, 971, 72), ]
     slateTexts = [
             ( 'StartHandle', '', 50, 1100, 90 , 800, 60 ),
             ( 'EndHandle'  , '', 50, 1100, 222, 800, 60 ),
