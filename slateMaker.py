@@ -13,17 +13,16 @@ class SlateMaker(gui.QAction):
     deleteExistingEffects = False
     doExpandHandles = True
     overlayTexts = [
-            ('ForReview', 'For Review', 50, 816, 1060, 362, 74),
-            ('FrameNumber', 'Frame [metadata input/frame]', 50, 1653, 27, 362,
-                72),
-            ('ShotName', '[metadata hiero/clip]', 50, 15, 20, 971, 72), ]
+            ('ForReview', 'For Review', 50, 0.2, 816, 1060, 362, 74),
+            ('FrameNumber', 'Frame [metadata input/frame]', 50, 0.2, 1653, 27, 362, 72),
+            ('ShotName', '[metadata hiero/clip]', 50, 0.2, 15, 20, 971, 72), ]
     slateTexts = [
-            ( 'StartHandle', '', 50, 1100, 90 , 800, 60 ),
-            ( 'EndHandle'  , '', 50, 1100, 222, 800, 60 ),
-            ( 'Duration'   , '', 50, 1100, 354, 800, 60 ),
-            ( 'Date'       , '', 50, 1100, 486, 800, 60 ),
-            ( 'Version'    , '', 50, 1100, 618, 800, 60 ),
-            ( 'Shot'       , '', 50, 1100, 750, 800, 60 ),
+            ( 'StartHandle', '', 50, 1.0, 1100, 90 , 800, 60 ),
+            ( 'EndHandle'  , '', 50, 1.0, 1100, 222, 800, 60 ),
+            ( 'Duration'   , '', 50, 1.0, 1100, 354, 800, 60 ),
+            ( 'Date'       , '', 50, 1.0, 1100, 486, 800, 60 ),
+            ( 'Version'    , '', 50, 1.0, 1100, 618, 800, 60 ),
+            ( 'Shot'       , '', 50, 1.0, 1100, 750, 800, 60 ),
             ]
     standardResolution = (2048, 1152)
 
@@ -110,20 +109,21 @@ class SlateMaker(gui.QAction):
         yRes = format.height()
 
         node = text2.node()
+        node.knob('opacity').setValue(data[3])
         node.knob('font_size').setValue(data[2])
         node.knob('message').setValue(data[1])
 
         scale = xRes / float(SlateMaker.standardResolution[0])
-        xPos  = round( data[3] * scale )
-        yDiff = round( scale * ( data[4] - SlateMaker.standardResolution[1]/2 ) )
+        xPos  = round( data[4] * scale )
+        yDiff = round( scale * ( data[5] - SlateMaker.standardResolution[1]/2 ) )
         yPos  = yRes/2 + yDiff
         font_size = round(data[2] * scale)
 
         box = node.knob('box')
         box.setX(xPos)
         box.setY(yPos)
-        box.setR(xPos+data[5]*scale)
-        box.setT(yPos+data[6]*scale)
+        box.setR(xPos+data[6]*scale)
+        box.setT(yPos+data[7]*scale)
 
         font_size = reduce( lambda l,n:l+list(n),
                 zip(range(256),[font_size]*256), [])
