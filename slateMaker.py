@@ -25,6 +25,7 @@ class SlateMaker(gui.QAction):
             ( 'Shot'       , '', 50, 1.0, 1100, 750, 800, 60 ),
             ]
     standardResolution = (2048, 1152)
+    maxExpandHandle = 6
 
     def __init__(self):
         ''' initialize Slate Maker Action'''
@@ -35,6 +36,7 @@ class SlateMaker(gui.QAction):
         self.vtrackItem = None
 
     def doit(self):
+
         if self.doExpandHandles:
             self.expandHandles()
         self.createOverlayTexts()
@@ -42,6 +44,14 @@ class SlateMaker(gui.QAction):
 
     def setItem(self, item):
         self.vtrackItem = item
+        self.updateItemTimes()
+
+
+    def setMaxExpandHandle(self, maxHandle):
+        self.maxExpandHandle = maxHandle
+
+    def updateItemTimes(self):
+        item = self.vtrackItem
         self.handleInLength = item.handleInLength()
         self.handleOutLength = item.handleOutLength()
         self.sourceIn= item.sourceIn()
@@ -53,15 +63,20 @@ class SlateMaker(gui.QAction):
     def expandHandles(self):
         ''' Remove Handles  '''
         duration = self.timelineOut - self.timelineIn + 1
-        totalDuration = duration + self.handleInLength + self.handleOutLength
-        totalSourceDuration = totalDuration * self.playbackSpeed
+        # totalDuration = duration + self.handleInLength + self.handleOutLength
+        # totalSourceDuration = totalDuration * self.playbackSpeed
 
         item = self.vtrackItem
 
-        item.setTimelineIn(self.timelineIn - self.handleInLength)
-        item.setSourceIn(0)
-        item.setTimelineOut(self.timelineOut + self.handleOutLength)
-        item.setSourceOut(totalSourceDuration)
+        self.expandHandleIn = min(self.handleInLength, self.maxExpandHandle)
+        self.expandHandleOut = min(self.handleOutLength, self.maxExpandHandle)
+        self.totalDuration = duration + self.expandHandleIn + self.expandHandleOut
+        self.totalSourceDuration = self.totalDuration * self.playbackSpeed
+
+        item.setTimelineIn(self.timelineIn - self.expandHandleIn)
+        item.setSourceIn(self.handleInLength - self.expandHandleIn)
+        item.setTimelineOut(self.timelineOut + self.expandHandleOut)
+        item.setSourceOut(self.totalSourceDuration)
         item.setPlaybackSpeed(self.playbackSpeed)
 
     def createOverlayTexts(self):
@@ -150,8 +165,8 @@ class SlateMaker(gui.QAction):
         vtrackItems = [item for item in selection if isinstance(item,
             hcore.TrackItem) and item.mediaType() == item.MediaType.kVideo]
 
-        project = hcore.projects()[-1]
-        slateClips = project.clips('Slate')
+        self.project = hcore.projects()[-1]
+        slateClips = self.project.clips('Slate')
 
         if vtrackItems and slateClips:
             self.setItem(vtrackItems[0])
