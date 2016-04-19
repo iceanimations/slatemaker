@@ -1,14 +1,6 @@
 import hiero.core as hcore
-import hiero.ui as hui
 
-import datetime
-import PySide.QtGui as gui
-
-
-class SlateDialog(gui.QDialog):
-    pass
-
-class SlateMaker(gui.QAction):
+class SlateMaker(object):
     ''' make slate on the timeline '''
     deleteExistingEffects = False
     doExpandHandles = True
@@ -22,18 +14,14 @@ class SlateMaker(gui.QAction):
             ( 'Duration'   , '', 50, 1.0, 1100, 354, 800, 60 ),
             ( 'Date'       , '', 50, 1.0, 1100, 486, 800, 60 ),
             ( 'Version'    , '', 50, 1.0, 1100, 618, 800, 60 ),
-            ( 'Shot'       , '', 50, 1.0, 1100, 750, 800, 60 ),
-            ]
+            ( 'Shot'       , '', 50, 1.0, 1100, 750, 800, 60 ) ]
     standardResolution = (2048, 1152)
     maxExpandHandle = 6
 
-    def __init__(self):
+    def __init__(self, vtrackItem, slateClip=None):
         ''' initialize Slate Maker Action'''
-        gui.QAction.__init__(self, "Slate Maker", None)
-        self.triggered.connect(self.doit)
-        hcore.events.registerInterest("kShowContextMenu/kTimeline",
-                self.eventHandler)
-        self.vtrackItem = None
+        self.setSlateClip(slateClip)
+        self.setItem(vtrackItem)
 
     def doit(self):
 
@@ -46,6 +34,10 @@ class SlateMaker(gui.QAction):
         self.vtrackItem = item
         self.updateItemTimes()
 
+    def setSlateClip(self, slateClip=None):
+        if slateClip is None:
+            slateClip = SlateMaker.detectSlateClips()[0]
+        self.slateClip = slateClip
 
     def setMaxExpandHandle(self, maxHandle):
         self.maxExpandHandle = maxHandle
@@ -63,8 +55,6 @@ class SlateMaker(gui.QAction):
     def expandHandles(self):
         ''' Remove Handles  '''
         duration = self.timelineOut - self.timelineIn + 1
-        # totalDuration = duration + self.handleInLength + self.handleOutLength
-        # totalSourceDuration = totalDuration * self.playbackSpeed
 
         item = self.vtrackItem
 
@@ -108,8 +98,8 @@ class SlateMaker(gui.QAction):
             slateText = vtrack.createEffect(trackItem=slateItem,
                     effectType='Text2', subTrackIndex=idx)
             data = list(data)
-            if   idx == 0: data[1] = str(self.handleInLength)
-            elif idx == 1: data[1] = str(self.handleOutLength)
+            if   idx == 0: data[1] = str(self.expandHandleIn)
+            elif idx == 1: data[1] = str(self.expandHandleOut)
             elif idx == 2: data[1] = str(self.timelineOut-self.timelineIn+1)
             elif idx == 3: data[1] = "[clock format [clock seconds] -format %d-%m-%y]"
             elif idx == 4: data[1] = self.vtrackItem.source().name()
@@ -145,6 +135,15 @@ class SlateMaker(gui.QAction):
         node.knob('font_size_values').resize(len(font_size), 1)
         node.knob('font_size_values').setValue(font_size)
 
+    @staticmethod
+    def detectSlateClips():
+        project = hcore.projects()[-1]
+        return project.clips('Slate')
+
+    @staticmethod
+    def makeNew(vtrackItem, slateClip=None):
+        sm = SlateMaker(vtrackItem, slateClip)
+        sm.doit()
 
     def printItemTimes(self):
         item = self.vtrackItem
@@ -153,27 +152,4 @@ class SlateMaker(gui.QAction):
         print item.handleInLength(), item.handleOutLength()
         print item.handleInTime(), item.handleOutTime()
         print item.source().duration(), item.playbackSpeed()
-
-    def eventHandler(self, event):
-        if not hasattr(event.sender, "selection"):
-            return
-
-        selection = event.sender.selection()
-        if selection is None:
-            selection = []
-
-        vtrackItems = [item for item in selection if isinstance(item,
-            hcore.TrackItem) and item.mediaType() == item.MediaType.kVideo]
-
-        self.project = hcore.projects()[-1]
-        slateClips = self.project.clips('Slate')
-
-        if vtrackItems and slateClips:
-            self.setItem(vtrackItems[0])
-            self.slateClip = slateClips[0]
-            event.menu.addAction(self)
-
-    def unregister(self):
-        hcore.events.unregisterInterest("kShowContextMenu/kTimeline",
-                self.eventHandler)
 

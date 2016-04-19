@@ -1,6 +1,6 @@
-from . import slateMaker
-reload(slateMaker)
+from . import slateMakerAction
+reload(slateMakerAction)
 
-from slateMaker import SlateMaker
+from slateMakerAction import SlateMakerAction
 
-sm = SlateMaker()
+sm = SlateMakerAction()
