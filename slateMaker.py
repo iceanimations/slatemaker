@@ -1,6 +1,8 @@
 import hiero.core as hcore
+import json
 
 __slateClipKeyword__ = 'Slate'
+__tagName__ = 'SlateMaker'
 
 class Slate(object):
 
@@ -11,22 +13,30 @@ class Slate(object):
         self.overlayTexts = overlayTexts if overlayTexts else []
         self.slateTexts = slateTexts if slateTexts else []
 
-
 class SlateMaker(object):
     ''' make slate on the timeline '''
-    deleteExistingEffects = False
     doExpandHandles = True
-    overlayTexts = [
+    defaultOverlayTexts = (
             ('ForReview', 'For Review', 50, 0.2, 816, 1060, 362, 74),
             ('FrameNumber', 'Frame [metadata input/frame]', 50, 0.2, 1653, 27, 362, 72),
-            ('ShotName', '[metadata hiero/clip]', 50, 0.2, 15, 20, 971, 72), ]
-    slateTexts = [
-            ( 'StartHandle', '', 50, 1.0, 1100, 90 , 800, 60 ),
-            ( 'EndHandle'  , '', 50, 1.0, 1100, 222, 800, 60 ),
-            ( 'Duration'   , '', 50, 1.0, 1100, 354, 800, 60 ),
-            ( 'Date'       , '', 50, 1.0, 1100, 486, 800, 60 ),
-            ( 'Version'    , '', 50, 1.0, 1100, 618, 800, 60 ),
-            ( 'Shot'       , '', 50, 1.0, 1100, 750, 800, 60 ) ]
+            ('ShotName', '[metadata hiero/clip]', 50, 0.2, 15, 20, 971, 72),
+            )
+    overlayTexts = None
+    defaultSlateTexts = (
+            ( 'StartHandle', lambda self: str(self.trimIn*-1)
+                , 50, 1.0, 1100, 90 , 800, 60 ),
+            ( 'EndHandle'  , lambda self: str(self.trimOut*-1)
+                , 50, 1.0, 1100, 222, 800, 60 ),
+            ( 'Duration', lambda self: str(self.timelineOut-self.timelineIn+1)
+                , 50, 1.0, 1100, 354, 800, 60 ),
+            ( 'Date'       , "[clock format [clock seconds] -format %d-%m-%y]"
+                , 50, 1.0, 1100, 486, 800, 60 ),
+            ( 'Version'    , lambda self: self.vtrackItem.source().name()
+                , 50, 1.0, 1100, 618, 800, 60 ),
+            ( 'Shot'       , lambda self: self.vtrackItem.name()
+                , 50, 1.0, 1100, 750, 800, 60 )
+            )
+    slateTexts = None
     standardResolution = (2048, 1152)
     maxExpandHandle = 6
     slate = None
@@ -50,7 +60,6 @@ class SlateMaker(object):
     def removeSlate(self):
         if self.slate:
             print 'remove slate'
-
 
     def setItem(self, item):
         self.vtrackItem = item
@@ -79,15 +88,34 @@ class SlateMaker(object):
         item = self.vtrackItem
         self.trimIn = -1 * min(self.handleInLength, self.maxExpandHandle)
         self.trimOut = -1 * min(self.handleOutLength, self.maxExpandHandle)
-        item.trimIn(self.expandHandleIn)
-        item.trimOut(self.expandHandleOut)
+        item.trimIn(self.trimIn)
+        item.trimOut(self.trimOut)
+
+    def getOverlayTexts(self):
+        if self.overlayTexts is None:
+            self.overlayTexts = self.calcTexts(self.defaultOverlayTexts)
+        return self.overlayTexts
+
+    def calcTexts(self, defaults):
+        texts = []
+        for overlay in defaults:
+            overlay = list(overlay)
+            tmp = overlay[1]
+            overlay[1] = tmp(self) if hasattr(tmp, '__call__') else tmp
+            texts.append(overlay)
+        return texts
 
     def createOverlayTexts(self):
         vtrack = self.vtrackItem.parentTrack()
-
-        for data in self.overlayTexts:
-            text2 = vtrack.createEffect(trackItem=self.vtrackItem, effectType='Text2')
+        for idx, data in enumerate( self.getOverlayTexts() ):
+            text2 = vtrack.createEffect(trackItem=self.vtrackItem,
+                    effectType='Text2', subTrackIndex=idx)
             SlateMaker.modifyTextEffect(text2, data)
+
+    def getSlateTexts(self):
+        if self.slateTexts is None:
+            self.slateTexts = self.calcTexts(self.defaultSlateTexts)
+        return self.slateTexts
 
     def createSlate(self):
         vtrack = self.vtrackItem.parentTrack()
@@ -99,18 +127,62 @@ class SlateMaker(object):
         slateItem.setTimelineIn(slateTimelineIn)
         slateItem.setTimelineOut(slateTimelineIn)
         vtrack.addTrackItem(slateItem)
+        self._createTag()
+        self.createSlateTexts()
+        return slateItem
 
-        for idx, data in enumerate( self.slateTexts ):
-            slateText = vtrack.createEffect(trackItem=slateItem,
+    def createSlateTexts(self):
+        vtrack = self.vtrackItem.parentTrack()
+        textEffects = []
+        for idx, data in enumerate( self.getSlateTexts() ):
+            slateText = vtrack.createEffect(trackItem=self.slateItem,
                     effectType='Text2', subTrackIndex=idx)
-            data = list(data)
-            if   idx == 0: data[1] = str(self.expandHandleIn)
-            elif idx == 1: data[1] = str(self.expandHandleOut)
-            elif idx == 2: data[1] = str(self.timelineOut-self.timelineIn+1)
-            elif idx == 3: data[1] = "[clock format [clock seconds] -format %d-%m-%y]"
-            elif idx == 4: data[1] = self.vtrackItem.source().name()
-            elif idx == 5: data[1] = self.vtrackItem.name()
             SlateMaker.modifyTextEffect( slateText, data )
+            textEffects.append(slateText)
+        return textEffects
+
+    def _createTransition(self):
+        slateItem, vtrackItem = self.slateItem, self.vtrackItem
+        transition = hcore.Transition()
+        transition = transition.createDissolveTransition(slateItem, vtrackItem, 1, 1)
+        self.vtrackItem.parentTrack().addTransition(transition)
+        return transition
+
+    def _createTag(self):
+        tag = hcore.Tag('SlateMaker')
+        data = {
+                'keyword': __slateClipKeyword__,
+                'trimIn': self.trimIn,
+                'trimOut': self.trimOut
+        }
+        tag.setNote(json.dumps(data))
+        tag.setIcon('icons:TagNote.png')
+        tag.setVisible(False)
+        self.vtrackItem.addTag(tag)
+        return tag
+
+    def _slateName(self):
+        keyword = __slateClipKeyword__
+        tagdata = self._getTagData()
+        if tagdata.has_key('keyword'):
+            keyword = tagdata.get('keyword')
+        return '_'.join([self.vtrackItem.name(), keyword])
+
+    def _getTagData(self):
+        data = {}
+        for tag in self.vtrackItem.tags():
+            if tag.name().beginswith == __tagName__:
+                data = json.loads(tag.note())
+        return data
+
+    def findSlateItem(self):
+        slateTime = self.timelineIn() - 1
+        slateName = self._slateName()
+        slateItem = None
+        for item in self.vtrackItem.parentTrack().items():
+            if item.name() == slateName and item.timelineIn() == slateTime:
+                slateItem = item
+        return slateItem
 
     @staticmethod
     def modifyTextEffect(text2, data):
