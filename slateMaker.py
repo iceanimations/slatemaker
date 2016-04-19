@@ -1,5 +1,17 @@
 import hiero.core as hcore
 
+__slateClipKeyword__ = 'Slate'
+
+class Slate(object):
+
+    def __init__(self, vtrackItem=None, slateItem=None, overlayTexts=None,
+            slateTexts=None):
+        self.vtrackItem = vtrackItem
+        self.slateItem = slateItem
+        self.overlayTexts = overlayTexts if overlayTexts else []
+        self.slateTexts = slateTexts if slateTexts else []
+
+
 class SlateMaker(object):
     ''' make slate on the timeline '''
     deleteExistingEffects = False
@@ -17,18 +29,28 @@ class SlateMaker(object):
             ( 'Shot'       , '', 50, 1.0, 1100, 750, 800, 60 ) ]
     standardResolution = (2048, 1152)
     maxExpandHandle = 6
+    slate = None
 
     def __init__(self, vtrackItem, slateClip=None):
         ''' initialize Slate Maker Action'''
         self.setSlateClip(slateClip)
         self.setItem(vtrackItem)
 
-    def doit(self):
+    def updateSlate(self):
 
-        if self.doExpandHandles:
-            self.expandHandles()
-        self.createOverlayTexts()
-        self.createSlate()
+        if self.slate:
+            print 'updating'
+        else:
+            print 'creating new'
+            if self.doExpandHandles:
+                self.expandHandles()
+            self.createOverlayTexts()
+            self.createSlate()
+
+    def removeSlate(self):
+        if self.slate:
+            print 'remove slate'
+
 
     def setItem(self, item):
         self.vtrackItem = item
@@ -54,39 +76,23 @@ class SlateMaker(object):
 
     def expandHandles(self):
         ''' Remove Handles  '''
-        duration = self.timelineOut - self.timelineIn + 1
-
         item = self.vtrackItem
-
-        self.expandHandleIn = min(self.handleInLength, self.maxExpandHandle)
-        self.expandHandleOut = min(self.handleOutLength, self.maxExpandHandle)
-        self.totalDuration = duration + self.expandHandleIn + self.expandHandleOut
-        self.totalSourceDuration = self.totalDuration * self.playbackSpeed
-
-        item.setTimelineIn(self.timelineIn - self.expandHandleIn)
-        item.setSourceIn(self.handleInLength - self.expandHandleIn)
-        item.setTimelineOut(self.timelineOut + self.expandHandleOut)
-        item.setSourceOut(self.totalSourceDuration)
-        item.setPlaybackSpeed(self.playbackSpeed)
+        self.trimIn = -1 * min(self.handleInLength, self.maxExpandHandle)
+        self.trimOut = -1 * min(self.handleOutLength, self.maxExpandHandle)
+        item.trimIn(self.expandHandleIn)
+        item.trimOut(self.expandHandleOut)
 
     def createOverlayTexts(self):
         vtrack = self.vtrackItem.parentTrack()
-
-        #if self.deleteExistingEffects:
-            #linkedSubTrackItems = [x for x in self.vtrackItem.linkedItems() if
-                    #isinstance(x, hcore.SubTrackItem)]
-            #self.vtrackItem.unlinkAll()
-            #for subitem in linkedSubTrackItems:
-                #vtrack.removeItem(subitem)
 
         for data in self.overlayTexts:
             text2 = vtrack.createEffect(trackItem=self.vtrackItem, effectType='Text2')
             SlateMaker.modifyTextEffect(text2, data)
 
-
     def createSlate(self):
         vtrack = self.vtrackItem.parentTrack()
-        slateItem = vtrack.createTrackItem('Slate')
+        slateItem = vtrack.createTrackItem(
+                '_'.join([self.vtrackItem.name(), __slateClipKeyword__]))
         self.slateItem = slateItem
         slateItem.setSource(self.slateClip)
         slateTimelineIn = self.vtrackItem.timelineIn() - 1
@@ -114,9 +120,9 @@ class SlateMaker(object):
         yRes = format.height()
 
         node = text2.node()
-        node.knob('opacity').setValue(data[3])
-        node.knob('font_size').setValue(data[2])
         node.knob('message').setValue(data[1])
+        node.knob('font_size').setValue(data[2])
+        node.knob('opacity').setValue(data[3])
 
         scale = xRes / float(SlateMaker.standardResolution[0])
         xPos  = round( data[4] * scale )
@@ -138,12 +144,12 @@ class SlateMaker(object):
     @staticmethod
     def detectSlateClips():
         project = hcore.projects()[-1]
-        return project.clips('Slate')
+        return project.clips(__slateClipKeyword__)
 
     @staticmethod
     def makeNew(vtrackItem, slateClip=None):
         sm = SlateMaker(vtrackItem, slateClip)
-        sm.doit()
+        sm.updateSlate()
 
     def printItemTimes(self):
         item = self.vtrackItem
