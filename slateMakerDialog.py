@@ -1,6 +1,9 @@
 import heiro.ui as hui
 import PySide.QtGui as gui
 
+from . import slateMaker
+reload(slateMaker)
+
 from .slateMaker import SlateMaker
 
 class SlateMakerDialog(gui.QDialog):

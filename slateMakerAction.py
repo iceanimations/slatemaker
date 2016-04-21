@@ -1,11 +1,13 @@
 import PySide.QtGui as gui
 import hiero.core as hcore
 
-
 from . import slateMaker
 reload(slateMaker)
-
 from .slateMaker import SlateMaker
+
+from . import slateMakerDialog
+reload(slateMakerDialog)
+from .slateMakerDialog import SlateMakerDialog
 
 class SlateMakerAction(gui.QAction):
     '''Action to initial slate maker'''

@@ -69,6 +69,8 @@ class SlateMaker(object):
 
     def setSlateClip(self, slateClip=None):
         if slateClip is None:
+            slateClip = self.findSlateItem()
+        if slateClip is None:
             slateClip = SlateMaker.detectSlateClips()[0]
         self.slateClip = slateClip
 
@@ -178,18 +180,17 @@ class SlateMaker(object):
     def _getTagData(self):
         data = {}
         for tag in self.vtrackItem.tags():
-            if tag.name().beginswith == __tagName__:
+            if tag.name().beginswith(__tagName__):
                 data = json.loads(tag.note())
         return data
 
     def findSlateItem(self):
         slateTime = self.timelineIn() - 1
         slateName = self._slateName()
-        slateItem = None
         for item in self.vtrackItem.parentTrack().items():
             if item.name() == slateName and item.timelineIn() == slateTime:
-                slateItem = item
-        return slateItem
+                self.slateItem = item
+        return self.slateItem
 
     @staticmethod
     def modifyTextEffect(text2, data):
