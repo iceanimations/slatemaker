@@ -10,8 +10,10 @@ class Slate(object):
             slateTexts=None):
         self.vtrackItem = vtrackItem
         self.slateItem = slateItem
+        self.tag = None
         self.overlayTexts = overlayTexts if overlayTexts else []
         self.slateTexts = slateTexts if slateTexts else []
+
 
 class SlateMaker(object):
     ''' make slate on the timeline '''
@@ -91,8 +93,8 @@ class SlateMaker(object):
         item.trimIn(self.trimIn)
         item.trimOut(self.trimOut)
 
-    def getOverlayTexts(self):
-        if self.overlayTexts is None:
+    def getOverlayTexts(self, recalc=False):
+        if self.overlayTexts is None or recalc:
             self.overlayTexts = self.calcTexts(self.defaultOverlayTexts)
         return self.overlayTexts
 
@@ -106,14 +108,18 @@ class SlateMaker(object):
         return texts
 
     def createOverlayTexts(self):
+        textEffects = []
         vtrack = self.vtrackItem.parentTrack()
         for idx, data in enumerate( self.getOverlayTexts() ):
             text2 = vtrack.createEffect(trackItem=self.vtrackItem,
                     effectType='Text2', subTrackIndex=idx)
             SlateMaker.modifyTextEffect(text2, data)
+            textEffects.append(text2)
+        self.overlayTextEffects = textEffects
+        return textEffects
 
-    def getSlateTexts(self):
-        if self.slateTexts is None:
+    def getSlateTexts(self, recalc=False):
+        if self.slateTexts is None or recalc:
             self.slateTexts = self.calcTexts(self.defaultSlateTexts)
         return self.slateTexts
 
@@ -127,7 +133,7 @@ class SlateMaker(object):
         slateItem.setTimelineIn(slateTimelineIn)
         slateItem.setTimelineOut(slateTimelineIn)
         vtrack.addTrackItem(slateItem)
-        self._createTag()
+        self.createTag()
         self.createSlateTexts()
         return slateItem
 
@@ -141,14 +147,14 @@ class SlateMaker(object):
             textEffects.append(slateText)
         return textEffects
 
-    def _createTransition(self):
+    def createTransition(self):
         slateItem, vtrackItem = self.slateItem, self.vtrackItem
         transition = hcore.Transition()
         transition = transition.createDissolveTransition(slateItem, vtrackItem, 1, 1)
         self.vtrackItem.parentTrack().addTransition(transition)
         return transition
 
-    def _createTag(self):
+    def createTag(self):
         tag = hcore.Tag('SlateMaker')
         data = {
                 'keyword': __slateClipKeyword__,
@@ -158,6 +164,7 @@ class SlateMaker(object):
         tag.setNote(json.dumps(data))
         tag.setIcon('icons:TagNote.png')
         tag.setVisible(False)
+        self.tag = tag
         self.vtrackItem.addTag(tag)
         return tag
 
