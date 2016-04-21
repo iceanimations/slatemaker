@@ -3,6 +3,7 @@ import hiero.core as hcore
 
 from . import slateMaker
 reload(slateMaker)
+
 from .slateMaker import SlateMaker
 
 from . import slateMakerDialog
@@ -21,7 +22,13 @@ class SlateMakerAction(gui.QAction):
         self.vtrackItem = None
 
     def onClick(self):
-        SlateMaker.makeNew(self.vtrackItem)
+        sm = SlateMaker(self.vtrackItem)
+        diag = SlateMakerDialog(sm)
+        diag.exec_()
+        if sm.slate:
+            sm.removeSlate()
+        else:
+            sm.update()
 
     def eventHandler(self, event):
         if not hasattr(event.sender, "selection"):
