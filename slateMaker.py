@@ -62,6 +62,10 @@ class Slate(object):
         if slateItem:
             return Slate(vtrackItem, slateItem)
 
+    @classmethod
+    def isSlate(cls, vtrackItem):
+        return vtrackItem.name().endswith(__slateClipKeyword__)
+
 class SlateTag(object):
     '''class wrapping tags with some utility functions'''
     __tagName__ = 'SlateMaker'
@@ -283,15 +287,12 @@ class SlateMaker(object):
             self.trimIn = self._trimIn
             self.trimOut = self._trimOut
             self.handlesCollapsed = False
-            print self.trimIn, self.trimOut, self.handlesCollapsed
 
     def updateHandles(self):
         if self.handlesCollapsed and self.doExpandHandles:
             self.expandHandles()
-            print 'expanding'
         elif not (self.handlesCollapsed or self.doExpandHandles):
             self.collapseHandles()
-            print 'collapsing'
 
     def calcTexts(self, defaults):
         texts = []

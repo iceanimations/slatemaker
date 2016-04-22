@@ -24,6 +24,8 @@ class SlateMakerAction(gui.QAction):
     def onClick(self):
 
         for vtrackItem in self.vtrackItems:
+            if slateMaker.Slate.isSlate(vtrackItem):
+                continue
             sm = SlateMaker(vtrackItem)
             if sm.slate:
                 sm.removeSlate()
