@@ -1,6 +1,7 @@
 import hiero.core as hcore
 import json
 
+
 __slateClipKeyword__ = 'Slate'
 
 class Slate(object):
@@ -78,8 +79,12 @@ class SlateTag(object):
     def getData(self):
         return json.loads(self.tag.note())
     def setData(self, data):
+        for tag in self.vtrackItem.tags():
+            if tag.name().startswith(self.__tagName__):
+                self.vtrackItem.removeTag(tag)
         self.tag.setNote(json.dumps(data))
-    data = property(fget=getData)
+        self.vtrackItem.addTag(self.tag)
+    data = property(fget=getData, fset=setData)
 
     @classmethod
     def find(cls, vtrackItem):
@@ -88,9 +93,9 @@ class SlateTag(object):
                 return SlateTag(tag, vtrackItem)
 
     @classmethod
-    def create(cls, vtrackItem, data=None, trimIn=0, trimOut=0,
-            handlesCollapsed=False):
-        tag = hcore.Tag(cls.__tagName__)
+    def create( cls, vtrackItem, data=None, trimIn=0, trimOut=0,
+            handlesCollapsed=True ):
+        tag = hcore.Tag( cls.__tagName__ )
 
         if not data:
             data = {
@@ -100,24 +105,23 @@ class SlateTag(object):
                     'handlesCollapsed': handlesCollapsed
             }
 
-        tag.setNote(json.dumps(data))
-        tag.setIcon('icons:TagNote.png')
-        tag.setVisible(False)
-        vtrackItem.addTag(tag)
-        return SlateTag(tag, vtrackItem)
+        tag.setNote( json.dumps(data) )
+        tag.setIcon( 'icons:TagNote.png' )
+        tag.setVisible( True )
+        vtrackItem.addTag( tag )
+        return SlateTag( tag, vtrackItem )
 
 class SlateMaker(object):
     ''' make slate on the timeline '''
     _doExpandHandles = True
-    _maxExpandHandle = 6
+    _maxExpandHandles = 6
 
     # defaults
     standardResolution = (2048, 1152)
     defaultOverlayTexts = (
             ('ForReview', 'For Review', 50, 0.2, 816, 1060, 362, 74),
             ('FrameNumber', 'Frame [metadata input/frame]', 50, 0.2, 1653, 27, 362, 72),
-            ('ShotName', '[metadata hiero/clip]', 50, 0.2, 15, 20, 971, 72),
-            )
+            ('ShotName', '[metadata hiero/clip]', 50, 0.2, 15, 20, 971, 72), )
     defaultSlateTexts = (
             ( 'StartHandle', lambda self: str(self.trimIn*-1)
                 , 50, 1.0, 1100, 90 , 800, 60 ),
@@ -130,8 +134,7 @@ class SlateMaker(object):
             ( 'Version'    , lambda self: self.vtrackItem.source().name()
                 , 50, 1.0, 1100, 618, 800, 60 ),
             ( 'Shot'       , lambda self: self.vtrackItem.name()
-                , 50, 1.0, 1100, 750, 800, 60 )
-            )
+                , 50, 1.0, 1100, 750, 800, 60 ))
 
     overlayTexts = None
     slateTexts = None
@@ -156,13 +159,15 @@ class SlateMaker(object):
         self.timelineIn = item.timelineIn()
         self.timelineOut = item.timelineOut()
         if self.handlesCollapsed and self.doExpandHandles:
-            self.trimInVal = -1 * min(self.handleInLength, self.maxExpandHandle)
-            self.trimOutVal = -1 * min(self.handleOutLength, self.maxExpandHandles)
+            self._trimIn = -1 * min(self.handleInLength,
+                    self.maxExpandHandles)
+            self._trimOut = -1 * min(self.handleOutLength,
+                    self.maxExpandHandles)
 
     def setItem(self, item):
         self.vtrackItem = item
-        self.slate = Slate.detectSlate(item)
-        self.tag = SlateTag.find(self.vtrackItem)
+        self.slate = Slate.detectSlate( item )
+        self.tag = SlateTag.find( self.vtrackItem )
         self.updateItemTimes()
 
     def update(self):
@@ -173,14 +178,17 @@ class SlateMaker(object):
 
     def removeSlate(self):
         if self.slate:
+            self.collapseHandles()
             vtrack = self.slate.vtrackItem.parentTrack()
-            for item in self.slate.slateTexts.values():
-                vtrack.removeSubTrackItem(item)
-            for item in self.slate.overlayTexts.values():
-                vtrack.removeSubTrackItem(item)
+            SlateMaker.removeSubTrackItems(self.slate.vtrackItem)
+            SlateMaker.removeSubTrackItems(self.slate.slateItem)
+            # for item in self.slate.slateTexts.values():
+                # vtrack.removeSubTrackItem(item)
+            # for item in self.slate.overlayTexts.values():
+                # vtrack.removeSubTrackItem(item)
             vtrack.removeItem(self.slate.slateItem)
-            if self.tag:
-                self.slate.vtrackItem.removeTag(self.tag)
+            # if self.tag:
+                # self.slate.vtrackItem.removeTag(self.tag)
             self.slate = None
             self.tag = None
 
@@ -202,13 +210,13 @@ class SlateMaker(object):
 
     def getHandlesCollapsed(self):
         if self.tag:
-            return self.tag.data.get( 'handlesCollapsed', False )
-        return False
+            return self.tag.getData().get( 'handlesCollapsed', True )
+        return True
     def setHandlesCollpsed(self, value):
         if self.tag:
-            data = self.tag.data
+            data = self.tag.getData()
             data['handlesCollapsed'] = value
-            self.tag.data = data
+            self.tag.setData(data)
         else:
             self.tag = SlateTag.create(self.vtrackItem, handlesCollapsed=value)
     handlesCollapsed = property(fget=getHandlesCollapsed,
@@ -216,33 +224,36 @@ class SlateMaker(object):
 
     def getTrimIn(self):
         if self.tag:
-            return self.tag.data.get( 'trimIn', 0 )
+            return self.tag.getData().get( 'trimIn', 0 )
         return 0
     def setTrimIn(self, value):
         if self.tag:
-            data = self.tag.data
+            data = self.tag.getData()
             data['trimIn'] = value
-            self.tag.data = data
+            self.tag.setData(data)
         else:
-            self.tag = SlateTag.create(self.vtrackItem, handlesCollapsed=value)
+            self.tag = SlateTag.create(self.vtrackItem, trimIn=value)
     trimIn = property(fget=getTrimIn, fset=setTrimIn)
 
     def getTrimOut(self):
         if self.tag:
-            return self.tag.data.get( 'trimOut', 0 )
+            return self.tag.getData().get( 'trimOut', 0 )
         return 0
     def setTrimOut(self, value):
         if self.tag:
-            data = self.tag.data
+            data = self.tag.getData()
             data['trimOut'] = value
-            self.tag.data = data
+            self.tag.setData(data)
         else:
-            self.tag = SlateTag.create(self.vtrackItem, handlesCollapsed=value)
+            self.tag = SlateTag.create(self.vtrackItem, trimOut=value)
     trimOut = property(fget=getTrimOut, fset=setTrimOut)
 
     def collapseHandles(self):
         item = self.vtrackItem
         if not self.handlesCollapsed:
+            for l_item in item.linkedItems():
+                l_item.trimIn(self.trimIn * -1)
+                l_item.trimOut(self.trimOut * -1)
             item.trimIn(self.trimIn * -1)
             item.trimOut(self.trimOut * -1)
             self.trimIn = 0
@@ -253,21 +264,31 @@ class SlateMaker(object):
 
     def expandHandles(self):
         item = self.vtrackItem
-        if not self.handlesCollapsed:
+        if self.handlesCollapsed:
             if self.slate:
-                self.slate.slateItem.setTimelineIn(
-                        item.timelineIn+self.trimInVal-1)
-            item.trimIn(self.trimInVal)
-            item.trimOut(self.trimOutVal)
-            self.trimIn = self.trimInVal
-            self.trimOut = self.trimOutVal
+                time = item.timelineIn+self._trimIn-1
+                for l_item in self.slate.slateItem.linkedItems():
+                    l_item.setTimelineIn(time)
+                    l_item.setTimelineOut(time)
+                self.slate.slateItem.setTimelineIn(time)
+                self.slate.slateItem.setTimelineOut(time)
+            for l_item in item.linkedItems():
+                l_item.trimIn(self._trimIn * -1)
+                l_item.trimOut(self._trimOut * -1)
+            item.trimIn(self._trimIn)
+            item.trimOut(self._trimOut)
+            self.trimIn = self._trimIn
+            self.trimOut = self._trimOut
             self.handlesCollapsed = False
+            print self.trimIn, self.trimOut, self.handlesCollapsed
 
     def updateHandles(self):
         if self.handlesCollapsed and self.doExpandHandles:
             self.expandHandles()
+            print 'expanding'
         elif not (self.handlesCollapsed or self.doExpandHandles):
             self.collapseHandles()
+            print 'collapsing'
 
     def calcTexts(self, defaults):
         texts = []
@@ -295,11 +316,14 @@ class SlateMaker(object):
         else:
             slateItem = vtrack.createTrackItem(
                     '_'.join([self.vtrackItem.name(), __slateClipKeyword__]))
-
         slateItem.setSource(self.slateClip)
         slateTimelineIn = self.vtrackItem.timelineIn() - 1
-        slateItem.setTimelineIn(slateTimelineIn)
-        slateItem.setTimelineOut(slateTimelineIn)
+        if slateTimelineIn > slateItem.timelineIn:
+            slateItem.setTimelineIn(slateTimelineIn)
+            slateItem.setTimelineOut(slateTimelineIn)
+        else:
+            slateItem.setTimelineOut(slateTimelineIn)
+            slateItem.setTimelineIn(slateTimelineIn)
         if not self.slate:
             vtrack.addTrackItem(slateItem)
         self.slate = Slate(self.vtrackItem, slateItem)
@@ -372,6 +396,13 @@ class SlateMaker(object):
     def makeNew(vtrackItem, slateClip=None):
         sm = SlateMaker(vtrackItem, slateClip)
         sm.update()
+
+    @staticmethod
+    def removeSubTrackItems(vtrackItem):
+        vtrack = vtrackItem.parent()
+        for item in vtrackItem.linkedItems():
+            vtrack.removeSubTrackItem(item)
+        vtrack.addItem(vtrackItem)
 
     def printItemTimes(self):
         item = self.vtrackItem
