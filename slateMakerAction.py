@@ -19,16 +19,16 @@ class SlateMakerAction(gui.QAction):
         self.triggered.connect(self.onClick)
         hcore.events.registerInterest("kShowContextMenu/kTimeline",
                 self.eventHandler)
-        self.vtrackItem = None
+        self.vtrackItems = []
 
     def onClick(self):
-        sm = SlateMaker(self.vtrackItem)
-        diag = SlateMakerDialog(sm)
-        diag.exec_()
-        if sm.slate:
-            sm.removeSlate()
-        else:
-            sm.update()
+
+        for vtrackItem in self.vtrackItems:
+            sm = SlateMaker(vtrackItem)
+            if sm.slate:
+                sm.removeSlate()
+            else:
+                sm.update()
 
     def eventHandler(self, event):
         if not hasattr(event.sender, "selection"):
@@ -45,7 +45,7 @@ class SlateMakerAction(gui.QAction):
         slateClips = SlateMaker.detectSlateClips()
 
         if vtrackItems and slateClips:
-            self.vtrackItem = vtrackItems[0]
+            self.vtrackItems = vtrackItems
             event.menu.addAction(self)
 
     def unregister(self):

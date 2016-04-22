@@ -79,17 +79,25 @@ class SlateTag(object):
     def getData(self):
         return json.loads(self.tag.note())
     def setData(self, data):
-        for tag in self.vtrackItem.tags():
-            if tag.name().startswith(self.__tagName__):
-                self.vtrackItem.removeTag(tag)
+        SlateTag.removeSlateTags(self.vtrackItem)
         self.tag.setNote(json.dumps(data))
         self.vtrackItem.addTag(self.tag)
     data = property(fget=getData, fset=setData)
 
     @classmethod
+    def removeSlateTags(cls, vtrackItem):
+        for tag in vtrackItem.tags():
+            if cls.isSlateTag(tag):
+                vtrackItem.removeTag(tag)
+
+    @classmethod
+    def isSlateTag(cls, tag):
+        return tag.name().startswith(cls.__tagName__)
+
+    @classmethod
     def find(cls, vtrackItem):
         for tag in vtrackItem.tags():
-            if tag.name().startswith(cls.__tagName__):
+            if SlateTag.isSlateTag(tag):
                 return SlateTag(tag, vtrackItem)
 
     @classmethod
@@ -182,13 +190,8 @@ class SlateMaker(object):
             vtrack = self.slate.vtrackItem.parentTrack()
             SlateMaker.removeSubTrackItems(self.slate.vtrackItem)
             SlateMaker.removeSubTrackItems(self.slate.slateItem)
-            # for item in self.slate.slateTexts.values():
-                # vtrack.removeSubTrackItem(item)
-            # for item in self.slate.overlayTexts.values():
-                # vtrack.removeSubTrackItem(item)
             vtrack.removeItem(self.slate.slateItem)
-            # if self.tag:
-                # self.slate.vtrackItem.removeTag(self.tag)
+            SlateTag.removeSlateTags(self.slate.vtrackItem)
             self.slate = None
             self.tag = None
 
