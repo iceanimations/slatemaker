@@ -159,7 +159,8 @@ class SlateMaker(object):
                 , 50, 1.0, 1100, 90 , 800, 60 ),
             ( 'EndHandle'  , lambda self: str(self.trimOut*-1)
                 , 50, 1.0, 1100, 222, 800, 60 ),
-            ( 'Duration', lambda self: str(self.timelineOut-self.timelineIn+1)
+            ( 'Duration', lambda self: str( self.vtrackItem.timelineOut() -
+                self.vtrackItem.timelineIn() + 1)
                 , 50, 1.0, 1100, 354, 800, 60 ),
             ( 'Date'       , "[clock format [clock seconds] -format %d-%m-%y]"
                 , 50, 1.0, 1100, 486, 800, 60 ),
@@ -285,10 +286,12 @@ class SlateMaker(object):
             out = timelineOut - self._trimIn
             right = self.getItemToTheRight()
             if (right and right.timelineIn() < out):
-                self._push = out - right.timelineIn() + 1
+                self._push = self._move + ( out - right.timelineIn()) + 1
 
 
     def moveItem(self, push):
+        for item in self.vtrackItem.linkedItems():
+            item.move(push)
         self.vtrackItem.move(push)
 
     def trimItem(self, trimIn, trimOut):
@@ -325,39 +328,44 @@ class SlateMaker(object):
                 slateItem.setTimelineIn(time)
                 slateItem.setTimelineOut(time)
 
-
-    def collapseHandles(self):
-        item = self.vtrackItem
-        if not self.handlesCollapsed:
-            for l_item in item.linkedItems():
-                l_item.trimIn(self.trimIn * -1)
-                l_item.trimOut(self.trimOut * -1)
-            item.trimIn(self.trimIn * -1)
-            item.trimOut(self.trimOut * -1)
-            self.trimIn = 0
-            self.trimOut = 0
-            self.handlesCollapsed = True
-            if self.slate:
-                self.updateSlate()
-
     def expandHandles(self):
         item = self.vtrackItem
         if self.handlesCollapsed:
+
+            self.moveRightItems(self._push)
+            self.push = self._push
+            self._push = 0
+
+            self.moveItem(self._move)
+            self.move = self._move
+            self._move = 0
+
             if self.slate:
                 time = item.timelineIn+self._trimIn-1
-                for l_item in self.slate.slateItem.linkedItems():
-                    l_item.setTimelineIn(time)
-                    l_item.setTimelineOut(time)
-                self.slate.slateItem.setTimelineIn(time)
-                self.slate.slateItem.setTimelineOut(time)
-            for l_item in item.linkedItems():
-                l_item.trimIn(self._trimIn * -1)
-                l_item.trimOut(self._trimOut * -1)
-            item.trimIn(self._trimIn)
-            item.trimOut(self._trimOut)
-            self.trimIn = self._trimIn
-            self.trimOut = self._trimOut
+                self.setSlateItemTime(time)
+
+            self.trimItem(self._trimIn, self._trimOut)
+            self.trimIn, self.trimOut = self._trimIn, self._trimOut
+            self._trimIn, self._trimOut = 0, 0
+
             self.handlesCollapsed = False
+
+    def collapseHandles(self):
+        '''assume for now slate has already been removed'''
+        if not self.handlesCollapsed:
+
+            self.trimItem(self.trimIn*-1, self.trimOut*-1)
+            self.trimIn, self.trimOut = 0, 0
+
+            self.moveItem(self.move*-1)
+            self.move = 0
+
+            self.moveRightItems(self.push*-1)
+            self.push = 0
+
+            self.handlesCollapsed = True
+            if self.slate:
+                self.updateSlate()
 
     def updateHandles(self):
         if self.handlesCollapsed and self.doExpandHandles:
