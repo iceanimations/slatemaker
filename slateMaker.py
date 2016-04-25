@@ -125,9 +125,7 @@ class SlateTag(object):
         vtrackItem.addTag( tag )
         return SlateTag( tag, vtrackItem )
 
-
 class TagData(object):
-
     def __init__(self, keyword, default):
         self.keyword = keyword
         self.default = default
@@ -190,20 +188,6 @@ class SlateMaker(object):
             slateClip = SlateMaker.detectSlateClips()[0]
         self.slateClip = slateClip
 
-    def updateItemTimes(self):
-        item = self.vtrackItem
-        self.handleInLength = item.handleInLength()
-        self.handleOutLength = item.handleOutLength()
-        self.sourceIn = item.sourceIn()
-        self.sourceOut = item.sourceOut()
-        self.timelineIn = item.timelineIn()
-        self.timelineOut = item.timelineOut()
-        if self.handlesCollapsed and self.doExpandHandles:
-            self._trimIn = -1 * min(self.handleInLength,
-                    self.maxExpandHandles)
-            self._trimOut = -1 * min(self.handleOutLength,
-                    self.maxExpandHandles)
-
     def setItem(self, item):
         self.vtrackItem = item
         self.slate = Slate.detectSlate( item )
@@ -242,6 +226,105 @@ class SlateMaker(object):
         return self._maxExpandHandles
     maxExpandHandles = property(fset=setMaxExpandHandles,
             fget=getMaxExpandHandles)
+
+    def getRightItems(self, getLinkedItems=False):
+        vtrack = self.vtrackItem.parentTrack()
+        timelineOut = self.vtrackItem.timelineOut()
+        rightItems = [item for item in vtrack.items() if item.timelineIn() >
+                timelineOut]
+        if getLinkedItems:
+            linkedItems = reduce(lambda a, b: a+list(b.linkedItems),
+                    rightItems, [])
+            rightItems.extend(linkedItems)
+        return rightItems
+
+    def getLeftItems(self, getLinkedItems=False):
+        vtrack = self.vtrackItem.parentTrack()
+        timelineIn = self.vtrackItem.timelineIn()
+        leftItems = [item for item in vtrack.items() if item.timelineOut() <
+                timelineIn]
+        if getLinkedItems:
+            linkedItems = reduce(lambda a, b: a+list(b.linkedItems),
+                    leftItems, [])
+            leftItems.extend(linkedItems)
+        return leftItems
+
+    def getItemToTheLeft(self):
+        nearest = None
+        leftItems = self.getLeftItems()
+        for item in leftItems:
+            if ((not nearest) or nearest.timelineOut < item.timelineOut):
+                nearest = item
+        return nearest
+
+    def getItemToTheRight(self):
+        nearest = None
+        rightItems = self.getRightItems()
+        for item in rightItems:
+            if ((not nearest) or nearest.timelineIn > item.timelineIn):
+                nearest = item
+        return nearest
+
+    def updateItemTimes(self):
+        item = self.vtrackItem
+        handleInLength = item.handleInLength()
+        handleOutLength = item.handleOutLength()
+        timelineIn = item.timelineIn()
+        timelineOut = item.timelineOut()
+
+        if self.handlesCollapsed and self.doExpandHandles:
+
+            self._trimIn = -1 * min(handleInLength, self.maxExpandHandles)
+            self._trimOut = -1 * min(handleOutLength, self.maxExpandHandles)
+
+            slateIn = timelineIn + self._trimIn - 1
+            left = self.getItemToTheLeft()
+            if (left and left.timelineOut() > slateIn):
+                self._move = left.timelineOut + slateIn + 1
+
+            out = timelineOut - self._trimIn
+            right = self.getItemToTheRight()
+            if (right and right.timelineIn() < out):
+                self._push = out - right.timelineIn() + 1
+
+
+    def moveItem(self, push):
+        self.vtrackItem.move(push)
+
+    def trimItem(self, trimIn, trimOut):
+        for item in self.vtrackItem.linkedItems():
+            item.trimIn(trimIn)
+            item.trimOut(trimOut)
+        item.trimIn(trimIn)
+        item.trimOut(trimOut)
+
+    def moveRightItems(self, move):
+        rightItems = self.getRightItems(True)
+        self.vtrackItem.move(rightItems, move)
+
+    def setSlateItemTime(self, time, slateItem = None):
+        '''Set Slate Item Time'''
+
+        if ( not slateItem ) and self.slate:
+            slateItem = self.slate.slateItem
+
+        if slateItem:
+            moveForward = slateItem.timelineIn() < time
+            for item in slateItem.linkedItems():
+                if moveForward:
+                    item.setTimelineOut(time)
+                    item.setTimelineIn(time)
+                else:
+                    item.setTimelineIn(time)
+                    item.setTimelineOut(time)
+
+            if moveForward:
+                slateItem.setTimelineOut(time)
+                slateItem.setTimelineIn(time)
+            else:
+                slateItem.setTimelineIn(time)
+                slateItem.setTimelineOut(time)
+
 
     def collapseHandles(self):
         item = self.vtrackItem
@@ -310,12 +393,7 @@ class SlateMaker(object):
                     '_'.join([self.vtrackItem.name(), __slateClipKeyword__]))
         slateItem.setSource(self.slateClip)
         slateTimelineIn = self.vtrackItem.timelineIn() - 1
-        if slateTimelineIn > slateItem.timelineIn:
-            slateItem.setTimelineIn(slateTimelineIn)
-            slateItem.setTimelineOut(slateTimelineIn)
-        else:
-            slateItem.setTimelineOut(slateTimelineIn)
-            slateItem.setTimelineIn(slateTimelineIn)
+        self.setSlateItemTime(slateTimelineIn, slateItem)
         if not self.slate:
             vtrack.addTrackItem(slateItem)
         self.slate = Slate(self.vtrackItem, slateItem)
