@@ -106,7 +106,7 @@ class SlateTag(object):
 
     @classmethod
     def create( cls, vtrackItem, data=None, trimIn=0, trimOut=0,
-            handlesCollapsed=True ):
+            handlesCollapsed=True, move=0, push=0 ):
         tag = hcore.Tag( cls.__tagName__ )
 
         if not data:
@@ -114,7 +114,9 @@ class SlateTag(object):
                     'keyword': __slateClipKeyword__,
                     'trimIn': trimIn,
                     'trimOut': trimOut,
-                    'handlesCollapsed': handlesCollapsed
+                    'handlesCollapsed': handlesCollapsed,
+                    'move': move,
+                    'push': push
             }
 
         tag.setNote( json.dumps(data) )
@@ -122,6 +124,26 @@ class SlateTag(object):
         tag.setVisible( True )
         vtrackItem.addTag( tag )
         return SlateTag( tag, vtrackItem )
+
+
+class TagData(object):
+
+    def __init__(self, keyword, default):
+        self.keyword = keyword
+        self.default = default
+
+    def __get__(self, instance, owner):
+        tag = instance.tag
+        if tag:
+            return tag.data.get(self.keyword, self.default)
+        return self.default
+
+    def __set__(self, instance, value):
+        if not instance.tag:
+            instance.tag = SlateTag.create(instance.vtrackItem)
+        data = instance.tag.data
+        data[self.keyword]=value
+        instance.tag.data = data
 
 class SlateMaker(object):
     ''' make slate on the timeline '''
@@ -151,6 +173,12 @@ class SlateMaker(object):
     overlayTexts = None
     slateTexts = None
     slate = None
+
+    trimOut = TagData('trimOut', 0)
+    trimIn = TagData('trimIn', 0)
+    handlesCollapsed = TagData('handlesCollapsed', True)
+    move = TagData('move', 0)
+    push = TagData('push', 0)
 
     def __init__(self, vtrackItem, slateClip=None):
         ''' initialize Slate Maker Action'''
@@ -214,46 +242,6 @@ class SlateMaker(object):
         return self._maxExpandHandles
     maxExpandHandles = property(fset=setMaxExpandHandles,
             fget=getMaxExpandHandles)
-
-    def getHandlesCollapsed(self):
-        if self.tag:
-            return self.tag.getData().get( 'handlesCollapsed', True )
-        return True
-    def setHandlesCollpsed(self, value):
-        if self.tag:
-            data = self.tag.getData()
-            data['handlesCollapsed'] = value
-            self.tag.setData(data)
-        else:
-            self.tag = SlateTag.create(self.vtrackItem, handlesCollapsed=value)
-    handlesCollapsed = property(fget=getHandlesCollapsed,
-            fset=setHandlesCollpsed)
-
-    def getTrimIn(self):
-        if self.tag:
-            return self.tag.getData().get( 'trimIn', 0 )
-        return 0
-    def setTrimIn(self, value):
-        if self.tag:
-            data = self.tag.getData()
-            data['trimIn'] = value
-            self.tag.setData(data)
-        else:
-            self.tag = SlateTag.create(self.vtrackItem, trimIn=value)
-    trimIn = property(fget=getTrimIn, fset=setTrimIn)
-
-    def getTrimOut(self):
-        if self.tag:
-            return self.tag.getData().get( 'trimOut', 0 )
-        return 0
-    def setTrimOut(self, value):
-        if self.tag:
-            data = self.tag.getData()
-            data['trimOut'] = value
-            self.tag.setData(data)
-        else:
-            self.tag = SlateTag.create(self.vtrackItem, trimOut=value)
-    trimOut = property(fget=getTrimOut, fset=setTrimOut)
 
     def collapseHandles(self):
         item = self.vtrackItem
