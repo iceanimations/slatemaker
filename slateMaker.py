@@ -203,11 +203,11 @@ class SlateMaker(object):
 
     def removeSlate(self):
         if self.slate:
-            self.collapseHandles()
             vtrack = self.slate.vtrackItem.parentTrack()
             SlateMaker.removeSubTrackItems(self.slate.vtrackItem)
             SlateMaker.removeSubTrackItems(self.slate.slateItem)
             vtrack.removeItem(self.slate.slateItem)
+            self.collapseHandles()
             SlateTag.removeSlateTags(self.slate.vtrackItem)
             self.slate = None
             self.tag = None
@@ -234,7 +234,7 @@ class SlateMaker(object):
         rightItems = [item for item in vtrack.items() if item.timelineIn() >
                 timelineOut]
         if getLinkedItems:
-            linkedItems = reduce(lambda a, b: a+list(b.linkedItems),
+            linkedItems = reduce(lambda a, b: a+list(b.linkedItems()),
                     rightItems, [])
             rightItems.extend(linkedItems)
         return rightItems
@@ -245,7 +245,7 @@ class SlateMaker(object):
         leftItems = [item for item in vtrack.items() if item.timelineOut() <
                 timelineIn]
         if getLinkedItems:
-            linkedItems = reduce(lambda a, b: a+list(b.linkedItems),
+            linkedItems = reduce(lambda a, b: a+list(b.linkedItems()),
                     leftItems, [])
             leftItems.extend(linkedItems)
         return leftItems
@@ -254,7 +254,7 @@ class SlateMaker(object):
         nearest = None
         leftItems = self.getLeftItems()
         for item in leftItems:
-            if ((not nearest) or nearest.timelineOut < item.timelineOut):
+            if ((not nearest) or nearest.timelineOut() < item.timelineOut):
                 nearest = item
         return nearest
 
@@ -262,7 +262,7 @@ class SlateMaker(object):
         nearest = None
         rightItems = self.getRightItems()
         for item in rightItems:
-            if ((not nearest) or nearest.timelineIn > item.timelineIn):
+            if ((not nearest) or nearest.timelineIn() > item.timelineIn):
                 nearest = item
         return nearest
 
@@ -278,16 +278,17 @@ class SlateMaker(object):
             self._trimIn = -1 * min(handleInLength, self.maxExpandHandles)
             self._trimOut = -1 * min(handleOutLength, self.maxExpandHandles)
 
+            self._move = 0
             slateIn = timelineIn + self._trimIn - 1
             left = self.getItemToTheLeft()
-            if (left and left.timelineOut() > slateIn):
-                self._move = left.timelineOut + slateIn + 1
+            if ( left and left.timelineOut() > slateIn ):
+                self._move = left.timelineOut() - slateIn + 1
 
+            self._push = 0
             out = timelineOut - self._trimIn
             right = self.getItemToTheRight()
-            if (right and right.timelineIn() < out):
+            if ( right and right.timelineIn() < out ):
                 self._push = self._move + ( out - right.timelineIn()) + 1
-
 
     def moveItem(self, push):
         for item in self.vtrackItem.linkedItems():
@@ -298,12 +299,12 @@ class SlateMaker(object):
         for item in self.vtrackItem.linkedItems():
             item.trimIn(trimIn)
             item.trimOut(trimOut)
-        item.trimIn(trimIn)
-        item.trimOut(trimOut)
+        self.vtrackItem.trimIn(trimIn)
+        self.vtrackItem.trimOut(trimOut)
 
     def moveRightItems(self, move):
         rightItems = self.getRightItems(True)
-        self.vtrackItem.move(rightItems, move)
+        self.vtrackItem.moveTrackItems(rightItems, move)
 
     def setSlateItemTime(self, time, slateItem = None):
         '''Set Slate Item Time'''
