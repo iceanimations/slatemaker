@@ -23,7 +23,13 @@ class SlateMakerAction(gui.QAction):
 
     def onClick(self):
 
-        for vtrackItem in self.vtrackItems:
+        items = sorted(self.vtrackItems, key=lambda t:t.timelineIn(),
+                reverse=True)
+
+        if items:
+            items = items[1:] + [ items[0] ]
+
+        for vtrackItem in items:
             if slateMaker.Slate.isSlate(vtrackItem):
                 continue
             sm = SlateMaker(vtrackItem)
