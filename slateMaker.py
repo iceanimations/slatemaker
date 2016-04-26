@@ -147,6 +147,7 @@ class SlateMaker(object):
     ''' make slate on the timeline '''
     _doExpandHandles = True
     _maxExpandHandles = 6
+    _doMoveUp = True
 
     # defaults
     standardResolution = (2048, 1152)
@@ -196,6 +197,7 @@ class SlateMaker(object):
         self.updateItemTimes()
 
     def update(self):
+        self.moveUp()
         self.updateHandles()
         self.updateSlate()
         self.updateOverlayTexts()
@@ -227,6 +229,13 @@ class SlateMaker(object):
         return self._maxExpandHandles
     maxExpandHandles = property(fset=setMaxExpandHandles,
             fget=getMaxExpandHandles)
+
+    def setDoMoveUp(self, doMoveUp):
+        self._doMoveUp = doMoveUp
+    def getDoMoveUp(self):
+        return self._doMoveUp
+    doMoveUp = property(fset=setDoMoveUp,
+            fget=getDoMoveUp)
 
     def getRightItems(self, getLinkedItems=False):
         vtrack = self.vtrackItem.parentTrack()
@@ -273,6 +282,9 @@ class SlateMaker(object):
         timelineIn = item.timelineIn()
         timelineOut = item.timelineOut()
 
+        self._push = self._move = 0
+        self._moveUp = False
+
         if self.handlesCollapsed and self.doExpandHandles:
 
             self._trimIn = -1 * min(handleInLength, self.maxExpandHandles)
@@ -289,6 +301,12 @@ class SlateMaker(object):
             right = self.getItemToTheRight()
             if ( right and right.timelineIn() < out ):
                 self._push = self._move + ( out - right.timelineIn()) + 1
+
+            self._moveUp = False
+            if self.doMoveUp and (left or self._move or self._push):
+                self._moveUp = True
+                self._move = 0
+                self._push = 0
 
     def moveItem(self, push):
         for item in self.vtrackItem.linkedItems():
@@ -367,6 +385,16 @@ class SlateMaker(object):
             self.handlesCollapsed = True
             if self.slate:
                 self.updateSlate()
+
+    def moveUp(self):
+        if self._moveUp:
+            vtrack = self.vtrackItem.parentTrack()
+            sequence = vtrack.parent()
+            new_track = hcore.VideoTrack(self.vtrackItem.name())
+            vtrack.removeItem(self.vtrackItem)
+            new_track.addItem(self.vtrackItem)
+            sequence.addTrack(new_track)
+            self._moveUp = False
 
     def updateHandles(self):
         if self.handlesCollapsed and self.doExpandHandles:
