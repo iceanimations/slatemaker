@@ -22,7 +22,6 @@ class SlateMakerAction(gui.QAction):
         self.vtrackItems = []
 
     def onClick(self):
-
         items = sorted(self.vtrackItems, key=lambda t:t.timelineIn(),
                 reverse=True)
 

@@ -147,7 +147,8 @@ class SlateMaker(object):
     ''' make slate on the timeline '''
     _doExpandHandles = True
     _maxExpandHandles = 6
-    _doMoveUp = True
+    _doMoveUp = False
+    _doMoveOut = True
 
     # defaults
     standardResolution = (2048, 1152)
@@ -197,6 +198,7 @@ class SlateMaker(object):
         self.updateItemTimes()
 
     def update(self):
+        self.moveOut()
         self.moveUp()
         self.updateHandles()
         self.updateSlate()
@@ -236,6 +238,13 @@ class SlateMaker(object):
         return self._doMoveUp
     doMoveUp = property(fset=setDoMoveUp,
             fget=getDoMoveUp)
+
+    def setDoMoveOut(self, doMoveOut):
+        self._doMoveOut = doMoveOut
+    def getDoMoveOut(self):
+        return self._doMoveOut
+    doMoveOut = property(fset=setDoMoveOut,
+            fget=getDoMoveOut)
 
     def getRightItems(self, getLinkedItems=False):
         vtrack = self.vtrackItem.parentTrack()
@@ -290,6 +299,7 @@ class SlateMaker(object):
             self._trimIn = -1 * min(handleInLength, self.maxExpandHandles)
             self._trimOut = -1 * min(handleOutLength, self.maxExpandHandles)
 
+
             self._move = 0
             slateIn = timelineIn + self._trimIn - 1
             left = self.getItemToTheLeft()
@@ -305,6 +315,10 @@ class SlateMaker(object):
             self._moveUp = False
             if self.doMoveUp and (left or self._move or self._push):
                 self._moveUp = True
+                self._move = 0
+                self._push = 0
+            elif self.doMoveOut:
+                self._moveUp = False
                 self._move = 0
                 self._push = 0
 
@@ -395,6 +409,25 @@ class SlateMaker(object):
             new_track.addItem(self.vtrackItem)
             sequence.addTrack(new_track)
             self._moveUp = False
+
+    def moveOut(self):
+        self.vtrackItem = self.createTrackItemInNewSequence()
+
+    def createTrackItemInNewSequence(self):
+        clip = self.vtrackItem.source()
+        position = self.vtrackItem.timelineIn()
+
+        project = hcore.projects()[-1]
+        newSeq = hcore.Sequence(self.vtrackItem.name())
+        project.clipsBin().addItem(hcore.BinItem(newSeq))
+        newVideoTrack = hcore.VideoTrack(self.vtrackItem.name())
+        newSeq.addTrack(newVideoTrack)
+        newTrackItem = newVideoTrack.addTrackItem(clip, position)
+        newTrackItem.setTimelineIn(self.vtrackItem.timelineIn())
+        newTrackItem.setSourceIn(self.vtrackItem.sourceIn())
+        newTrackItem.setSourceOut(self.vtrackItem.sourceOut())
+        newTrackItem.setTimelineOut(self.vtrackItem.timelineOut())
+        return newTrackItem
 
     def updateHandles(self):
         if self.handlesCollapsed and self.doExpandHandles:
