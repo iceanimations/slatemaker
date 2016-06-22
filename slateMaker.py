@@ -307,7 +307,7 @@ class SlateMaker(object):
                 self._move = left.timelineOut() - slateIn + 1
 
             self._push = 0
-            out = timelineOut - self._trimIn
+            out = timelineOut - self._trimOut
             right = self.getItemToTheRight()
             if ( right and right.timelineIn() < out ):
                 self._push = self._move + ( out - right.timelineIn()) + 1
@@ -422,11 +422,16 @@ class SlateMaker(object):
         project.clipsBin().addItem(hcore.BinItem(newSeq))
         newVideoTrack = hcore.VideoTrack(self.vtrackItem.name())
         newSeq.addTrack(newVideoTrack)
+
         newTrackItem = newVideoTrack.addTrackItem(clip, position)
         newTrackItem.setTimelineIn(self.vtrackItem.timelineIn())
         newTrackItem.setSourceIn(self.vtrackItem.sourceIn())
         newTrackItem.setSourceOut(self.vtrackItem.sourceOut())
         newTrackItem.setTimelineOut(self.vtrackItem.timelineOut())
+
+        newSeq.setInTime(newTrackItem.timelineIn()+self._trimIn-1)
+        newSeq.setOutTime(newTrackItem.timelineOut()-self._trimOut+1)
+
         return newTrackItem
 
     def updateHandles(self):
