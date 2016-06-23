@@ -312,13 +312,17 @@ class SlateMaker(object):
             if ( right and right.timelineIn() < out ):
                 self._push = self._move + ( out - right.timelineIn()) + 1
 
+            self._moveOut = False
             self._moveUp = False
+
             if self.doMoveUp and (left or self._move or self._push):
                 self._moveUp = True
                 self._move = 0
                 self._push = 0
-            elif self.doMoveOut:
+
+            if self.doMoveOut:
                 self._moveUp = False
+                self._moveOut = True
                 self._move = 0
                 self._push = 0
 
@@ -411,14 +415,15 @@ class SlateMaker(object):
             self._moveUp = False
 
     def moveOut(self):
-        self.vtrackItem = self.createTrackItemInNewSequence()
+        if self._moveOut:
+            self.vtrackItem = self.createTrackItemInNewSequence()
 
     def createTrackItemInNewSequence(self):
         clip = self.vtrackItem.source()
         position = self.vtrackItem.timelineIn()
 
         project = hcore.projects()[-1]
-        newSeq = hcore.Sequence(self.vtrackItem.name())
+        newSeq = hcore.Sequence(self.vtrackItem.currentVersion().name())
         project.clipsBin().addItem(hcore.BinItem(newSeq))
         newVideoTrack = hcore.VideoTrack(self.vtrackItem.name())
         newSeq.addTrack(newVideoTrack)
@@ -430,7 +435,7 @@ class SlateMaker(object):
         newTrackItem.setTimelineOut(self.vtrackItem.timelineOut())
 
         newSeq.setInTime(newTrackItem.timelineIn()+self._trimIn-1)
-        newSeq.setOutTime(newTrackItem.timelineOut()-self._trimOut+1)
+        newSeq.setOutTime(newTrackItem.timelineOut()-self._trimOut)
 
         return newTrackItem
 
