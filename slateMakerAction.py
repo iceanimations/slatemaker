@@ -5,8 +5,6 @@ from . import slateMaker
 reload(slateMaker)
 from . import slateMakerDialog
 reload(slateMakerDialog)
-from .import slateMakerSettings
-reload(slateMakerSettings)
 
 from .slateMaker import SlateMaker
 from .slateMakerDialog import SlateMakerDialog
@@ -29,8 +27,9 @@ class ActionHandler(object):
 
         if vtrackItems and slateClips:
             self.vtrackItems = vtrackItems
-            event.menu.addAction(SlateMakerAction(self.vtrackItems))
-            event.menu.addAction(SlateMakerDialogAction(self.vtrackItems))
+            self.actions = [SlateMakerAction(self.vtrackItems), SlateMakerDialogAction(self.vtrackItems)]
+            for action in self.actions:
+                event.menu.addAction(action)
 
     def register(self):
         hcore.events.registerInterest("kShowContextMenu/kTimeline",

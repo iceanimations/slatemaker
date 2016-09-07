@@ -1,9 +1,6 @@
 import hiero.core as hcore
 import json
 
-from . import slateMakerSettings
-reload(slateMakerSettings)
-
 from .slateMakerSettings import SlateMakerSettings
 
 __slateClipKeyword__ = 'Slate'
