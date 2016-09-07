@@ -1,9 +1,9 @@
 from . import slateMakerAction
 reload(slateMakerAction)
 
-from slateMakerAction import SlateMakerAction
-
-sm = SlateMakerAction()
+from slateMakerAction import ActionHandler
+sm = ActionHandler()
+sm.register()
 
 # import slateProcessor, slateProcessorUI
 

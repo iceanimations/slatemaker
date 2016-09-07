@@ -1,6 +1,10 @@
 import hiero.core as hcore
 import json
 
+from . import slateMakerSettings
+reload(slateMakerSettings)
+
+from .slateMakerSettings import SlateMakerSettings
 
 __slateClipKeyword__ = 'Slate'
 
@@ -185,6 +189,8 @@ class SlateMaker(object):
         ''' initialize Slate Maker Action'''
         self.setSlateClip(slateClip)
         self.setItem(vtrackItem)
+        self.displayOverlayTexts = {}
+        self.displaySlateTexts = {}
 
     def setSlateClip(self, slateClip=None):
         if slateClip is None:
@@ -298,7 +304,6 @@ class SlateMaker(object):
 
             self._trimIn = -1 * min(handleInLength, self.maxExpandHandles)
             self._trimOut = -1 * min(handleOutLength, self.maxExpandHandles)
-
 
             self._move = 0
             slateIn = timelineIn + self._trimIn - 1
@@ -445,23 +450,28 @@ class SlateMaker(object):
         elif not (self.handlesCollapsed or self.doExpandHandles):
             self.collapseHandles()
 
-    def calcTexts(self, defaults):
+    def calcTexts(self, defaults, display=None):
         texts = []
         for overlay in defaults:
             overlay = list(overlay)
+            name = overlay[0]
             tmp = overlay[1]
+            if display and not display.get(name, True):
+                continue
             overlay[1] = tmp(self) if hasattr(tmp, '__call__') else tmp
             texts.append(overlay)
         return texts
 
     def getSlateTexts(self, recalc=False):
         if self.slateTexts is None or recalc:
-            self.slateTexts = self.calcTexts(self.defaultSlateTexts)
+            self.slateTexts = self.calcTexts(self.defaultSlateTexts,
+                    self.displaySlateTexts)
         return self.slateTexts
 
     def getOverlayTexts(self, recalc=False):
         if self.overlayTexts is None or recalc:
-            self.overlayTexts = self.calcTexts(self.defaultOverlayTexts)
+            self.overlayTexts = self.calcTexts(self.defaultOverlayTexts,
+                    self.displayOverlayTexts)
         return self.overlayTexts
 
     def updateSlate(self):
@@ -553,6 +563,40 @@ class SlateMaker(object):
         for item in vtrackItem.linkedItems():
             vtrack.removeSubTrackItem(item)
         vtrack.addItem(vtrackItem)
+
+
+    @staticmethod
+    def makeSlates(vtrackItems):
+        ''' Make Slates using video trackItems '''
+
+        items = sorted(vtrackItems, key=lambda t:t.timelineIn(),
+                reverse=True)
+
+        if items:
+            items = items[1:] + [ items[0] ]
+
+        for vtrackItem in items:
+            if Slate.isSlate(vtrackItem):
+                continue
+
+            sm = SlateMaker(vtrackItem)
+            sm.readSettings()
+
+            if sm.slate:
+                sm.removeSlate()
+            else:
+                sm.update()
+
+    def readSettings(self):
+        settings = SlateMakerSettings()
+
+        self.doMoveOut = settings.doMoveOut
+        self.doMoveUp = settings.doMoveUp
+        self.displayOverlayTexts = settings.displayOverlayTexts
+        self.displaySlateTexts = settings.displaySlateTexts
+        self.doExpandHandles = settings.doExpandHandles
+        self.maxExpandHandles = settings.maxExpandHandles
+
 
     def printItemTimes(self):
         item = self.vtrackItem
