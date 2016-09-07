@@ -3,41 +3,15 @@ import hiero.core as hcore
 
 from . import slateMaker
 reload(slateMaker)
-
-from .slateMaker import SlateMaker
-
 from . import slateMakerDialog
 reload(slateMakerDialog)
+
+from .slateMaker import SlateMaker
 from .slateMakerDialog import SlateMakerDialog
 
-class SlateMakerAction(gui.QAction):
-    '''Action to initial slate maker'''
+class ActionHandler(object):
 
-    def __init__(self):
-        ''' initialize Slate Maker Action'''
-        gui.QAction.__init__(self, "Slate Maker", None)
-        self.triggered.connect(self.onClick)
-        hcore.events.registerInterest("kShowContextMenu/kTimeline",
-                self.eventHandler)
-        self.vtrackItems = []
-
-    def onClick(self):
-        items = sorted(self.vtrackItems, key=lambda t:t.timelineIn(),
-                reverse=True)
-
-        if items:
-            items = items[1:] + [ items[0] ]
-
-        for vtrackItem in items:
-            if slateMaker.Slate.isSlate(vtrackItem):
-                continue
-            sm = SlateMaker(vtrackItem)
-            if sm.slate:
-                sm.removeSlate()
-            else:
-                sm.update()
-
-    def eventHandler(self, event):
+    def event(self, event):
         if not hasattr(event.sender, "selection"):
             return
 
@@ -53,9 +27,43 @@ class SlateMakerAction(gui.QAction):
 
         if vtrackItems and slateClips:
             self.vtrackItems = vtrackItems
-            event.menu.addAction(self)
+            self.actions = [SlateMakerAction(self.vtrackItems), SlateMakerDialogAction(self.vtrackItems)]
+            for action in self.actions:
+                event.menu.addAction(action)
+
+    def register(self):
+        hcore.events.registerInterest("kShowContextMenu/kTimeline",
+                self.event)
 
     def unregister(self):
         hcore.events.unregisterInterest("kShowContextMenu/kTimeline",
-                self.eventHandler)
+                self.event)
+
+
+class SlateMakerAction(gui.QAction):
+    '''Action to initial slate maker'''
+
+    def __init__(self, vtrackItems=None):
+        ''' initialize Slate Maker Action'''
+        super(SlateMakerAction, self).__init__("Slate Maker", None)
+        self.triggered.connect(self.onClick)
+        if vtrackItems is not None:
+            self.vtrackItems = vtrackItems
+
+    def onClick(self):
+        SlateMaker.makeSlates(self.vtrackItems)
+
+class SlateMakerDialogAction(gui.QAction):
+    ''' Action to show Dialog Window '''
+
+    def __init__(self, vtrackItems=None):
+        ''' initialize Slate Maker Action'''
+        super(SlateMakerDialogAction, self).__init__("Slate Maker Options", None)
+        self.triggered.connect(self.onClick)
+        if vtrackItems is not None:
+            self.vtrackItems = vtrackItems
+
+    def onClick(self):
+        diag = SlateMakerDialog(self.vtrackItems)
+        diag.exec_()
 
