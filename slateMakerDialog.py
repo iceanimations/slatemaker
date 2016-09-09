@@ -36,7 +36,7 @@ class SlateMakerDialog(gui.QDialog):
                 checked=self.settings.doMoveUp, radio=True,
                 layout=self.moveLayout)
         self.doPushCheck = self.addCheckBox(
-                'Push Colliding Slates Left',
+                'Push Colliding Slates towards Right',
                 checked=not (self.settings.doMoveOut or
                     self.settings.doMoveUp), radio=True,
                 layout=self.moveLayout)

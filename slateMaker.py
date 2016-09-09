@@ -1,5 +1,6 @@
 import hiero.core as hcore
 import json
+from collections import namedtuple
 
 from .slateMakerSettings import SlateMakerSettings
 
@@ -144,6 +145,10 @@ class TagData(object):
         data[self.keyword]=value
         instance.tag.data = data
 
+TextEffectData = namedtuple('TextEffectData',
+        [ 'name', 'message', 'font_size', 'opacity', 'x', 'y', 'r', 't',
+            'visible' ], )
+
 class SlateMaker(object):
     ''' make slate on the timeline '''
     _doExpandHandles = True
@@ -154,23 +159,32 @@ class SlateMaker(object):
     # defaults
     standardResolution = (2048, 1152)
     defaultOverlayTexts = (
-            ('ForReview', 'For Review', 50, 0.2, 816, 1060, 362, 74),
-            ('FrameNumber', 'Frame [metadata input/frame]', 50, 0.2, 1653, 27, 362, 72),
-            ('ShotName', '[metadata hiero/clip]', 50, 0.2, 15, 20, 971, 72), )
+            TextEffectData('ForReview', 'For Review', 50, 0.2, 816, 1060, 362,
+                74, True),
+            TextEffectData('FrameNumber', 'Frame [metadata input/frame]', 50, 0.2, 1653, 27,
+                362, 72, True),
+            TextEffectData('ShotName', '[metadata hiero/clip]', 50, 0.2, 15, 20, 971, 72,
+                True), )
     defaultSlateTexts = (
-            ( 'StartHandle', lambda self: str(self.trimIn*-1)
-                , 50, 1.0, 1100, 90 , 800, 60 ),
-            ( 'EndHandle'  , lambda self: str(self.trimOut*-1)
-                , 50, 1.0, 1100, 222, 800, 60 ),
-            ( 'Duration', lambda self: str( self.vtrackItem.timelineOut() -
-                self.vtrackItem.timelineIn() + 1)
-                , 50, 1.0, 1100, 354, 800, 60 ),
-            ( 'Date'       , "[clock format [clock seconds] -format %d-%m-%y]"
-                , 50, 1.0, 1100, 486, 800, 60 ),
-            ( 'Version'    , lambda self: self.vtrackItem.source().name()
-                , 50, 1.0, 1100, 618, 800, 60 ),
-            ( 'Shot'       , lambda self: self.vtrackItem.name()
-                , 50, 1.0, 1100, 750, 800, 60 ))
+            TextEffectData( 'StartHandle',
+                'lambda self: str(self.trimIn*-1)' , 50, 1.0, 1100,
+                90 , 800, 60, True ),
+            TextEffectData( 'EndHandle'  , 'lambda self: str(self.trimOut*-1)' , 50, 1.0, 1100,
+                222, 800, 60, True ),
+            TextEffectData( 'Duration', 
+                    'lambda self: str( self.vtrackItem.timelineOut()'
+                    ' - self.vtrackItem.timelineIn() + 1)' ,
+                    50, 1.0, 1100, 354, 800,
+                60, True ),
+            TextEffectData( 'Date'       ,
+                "[clock format [clock seconds] -format %d-%m-%y]"
+                , 50, 1.0, 1100, 486, 800, 60, True ),
+            TextEffectData( 'Version'    ,
+                'lambda self: self.vtrackItem.source().name()' , 50,
+                1.0, 1100, 618, 800, 60, True ),
+            TextEffectData( 'Shot'       , 
+                'lambda self: self.vtrackItem.name()' , 50, 1.0,
+                1100, 750, 800, 60, True ))
 
     overlayTexts = None
     slateTexts = None
@@ -455,7 +469,8 @@ class SlateMaker(object):
             tmp = overlay[1]
             if display and not display.get(name, True):
                 continue
-            overlay[1] = tmp(self) if hasattr(tmp, '__call__') else tmp
+            # overlay[1] = tmp(self) if hasattr(tmp, '__call__') else tmp
+            overlay[1] = eval(tmp, locals(), globals())(self) if tmp.startswith('lambda') else tmp
             texts.append(overlay)
         return texts
 
@@ -527,17 +542,18 @@ class SlateMaker(object):
         node.knob('font_size').setValue(data[2])
         node.knob('opacity').setValue(data[3])
 
-        scale = xRes / float(SlateMaker.standardResolution[0])
-        xPos  = round( data[4] * scale )
-        yDiff = round( scale * ( data[5] - SlateMaker.standardResolution[1]/2 ) )
+        scaleX = xRes / float(SlateMaker.standardResolution[0])
+        scaleY = yRes / float(SlateMaker.standardResolution[1])
+        xPos  = round( data[4] * scaleX )
+        yDiff = round( scaleY * ( data[5] - SlateMaker.standardResolution[1]/2 ) )
         yPos  = yRes/2 + yDiff
-        font_size = round(data[2] * scale)
+        font_size = round(data[2] * scaleX)
 
         box = node.knob('box')
         box.setX(xPos)
         box.setY(yPos)
-        box.setR(xPos+data[6]*scale)
-        box.setT(yPos+data[7]*scale)
+        box.setR(xPos+data[6]*scaleX)
+        box.setT(yPos+data[7]*scaleY)
 
         font_size = reduce( lambda l,n:l+list(n),
                 zip(range(256),[font_size]*256), [])
