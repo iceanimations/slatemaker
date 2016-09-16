@@ -1,19 +1,21 @@
 import hiero.core as hcore
 import json
+from collections import namedtuple
+import re
+import sys
 
 from .slateMakerSettings import SlateMakerSettings
 
 __slateClipKeyword__ = 'Slate'
 
 class Slate(object):
-    ''' Slate info object'''
+    ''' Slate info object '''
 
     def __init__(self, vtrackItem=None, slateItem=None, tag=None):
         self.vtrackItem = vtrackItem
         self.slateItem = slateItem
         self._tag = tag
 
-    @property
     def getTag(self):
         if not self._tag:
             self._tag = SlateTag.find(self.vtrackItem)
@@ -24,7 +26,7 @@ class Slate(object):
     def overlayTexts(self):
         texts = {}
         for txt in SlateMaker.defaultOverlayTexts:
-            defaultName = txt[0]
+            defaultName = txt.name
             for effect in self.vtrackItem.linkedItems():
                 if effect.name().startswith(defaultName):
                     texts[defaultName]=effect
@@ -34,7 +36,7 @@ class Slate(object):
     def slateTexts(self):
         texts = {}
         for txt in SlateMaker.defaultSlateTexts:
-            defaultName = txt[0]
+            defaultName = txt.name
             for effect in self.slateItem.linkedItems():
                 if effect.name().startswith(defaultName):
                     texts[defaultName]=effect
@@ -144,33 +146,85 @@ class TagData(object):
         data[self.keyword]=value
         instance.tag.data = data
 
+class TextEffectData(namedtuple('_TextEffectData', [
+        'name',
+        'message',
+        'font_size',
+        'opacity',
+        'x',
+        'y',
+        'w',
+        'h',
+        'display',
+        'label' ]
+    )):
+
+    def eval_(self, instance):
+        msg = self.message
+        data = list(self)
+        if msg.startswith('lambda'):
+            data[1] = eval(msg, locals(), globals())(instance)
+        return TextEffectData(*data)
+
+    def setDisplay(self, display=True):
+        data = list(self)
+        data[8] = display
+        return TextEffectData(*data)
+
+class SlateMakerOption(object):
+    '''SlateMakerOption as a descriptor, cuz they are awesome'''
+
+    def __init__(self, name, default):
+        self.name = re.sub('\s', '', name)
+        self.default = default
+
+    def __get__(self, instance, owner):
+        if hasattr(instance, '_' + self.name):
+            return getattr(instance, '_' + self.name)
+        else:
+            return self.default
+
+    def __set__(self, instance, value ):
+        setattr(instance, '_' + self.name, value)
+
+Resolution = namedtuple('Resolution', ['x', 'y'])
+
 class SlateMaker(object):
     ''' make slate on the timeline '''
-    _doExpandHandles = True
-    _maxExpandHandles = 6
-    _doMoveUp = False
-    _doMoveOut = True
+    doExpandHandles = SlateMakerOption('doExpandHandles', True)
+    maxExpandHandles = SlateMakerOption('maxExpandHandles', 6)
+    doMoveUp = SlateMakerOption('doMoveUp', False)
+    doMoveOut = SlateMakerOption('doMoveOut', False)
+    doMakeLabels = SlateMakerOption('doMakeLabels', True)
 
     # defaults
-    standardResolution = (2048, 1152)
+    standardResolution = Resolution(2048, 1152)
     defaultOverlayTexts = (
-            ('ForReview', 'For Review', 50, 0.2, 816, 1060, 362, 74),
-            ('FrameNumber', 'Frame [metadata input/frame]', 50, 0.2, 1653, 27, 362, 72),
-            ('ShotName', '[metadata hiero/clip]', 50, 0.2, 15, 20, 971, 72), )
+            TextEffectData('ForReview', 'For Review', 50, 0.2, 816, 1060, 362,
+                74, True, ''),
+            TextEffectData('FrameNumber', 'Frame [metadata input/frame]', 50, 0.2, 1653, 27,
+                362, 72, True, ''),
+            TextEffectData('ShotName', '[metadata hiero/clip]', 50, 0.2, 15, 20, 971, 72,
+                True, ''), )
     defaultSlateTexts = (
-            ( 'StartHandle', lambda self: str(self.trimIn*-1)
-                , 50, 1.0, 1100, 90 , 800, 60 ),
-            ( 'EndHandle'  , lambda self: str(self.trimOut*-1)
-                , 50, 1.0, 1100, 222, 800, 60 ),
-            ( 'Duration', lambda self: str( self.vtrackItem.timelineOut() -
-                self.vtrackItem.timelineIn() + 1)
-                , 50, 1.0, 1100, 354, 800, 60 ),
-            ( 'Date'       , "[clock format [clock seconds] -format %d-%m-%y]"
-                , 50, 1.0, 1100, 486, 800, 60 ),
-            ( 'Version'    , lambda self: self.vtrackItem.source().name()
-                , 50, 1.0, 1100, 618, 800, 60 ),
-            ( 'Shot'       , lambda self: self.vtrackItem.name()
-                , 50, 1.0, 1100, 750, 800, 60 ))
+            TextEffectData( 'StartHandle',
+                'lambda inst: str(inst.trimIn*-1)' , 50, 1.0, 1100,
+                90 , 800, 60, True, 'Start Handle:' ),
+            TextEffectData( 'EndHandle'  , 'lambda inst: str(inst.trimOut*-1)' , 50, 1.0, 1100,
+                222, 800, 60, True, 'End Handle:' ),
+            TextEffectData( 'Duration', 
+                    'lambda inst: str( inst.vtrackItem.timelineOut()'
+                    ' - inst.vtrackItem.timelineIn() + 1)' ,
+                    50, 1.0, 1100, 354, 800, 60, True, 'Duration:' ),
+            TextEffectData( 'Date'       ,
+                "[clock format [clock seconds] -format %d-%m-%y]"
+                , 50, 1.0, 1100, 486, 800, 60, True, 'Date:' ),
+            TextEffectData( 'Version'    ,
+                'lambda inst: inst.vtrackItem.source().name()' , 50,
+                1.0, 1100, 618, 800, 60, True, 'Version:' ),
+            TextEffectData( 'Shot'       ,
+                'lambda inst: inst.vtrackItem.name()' , 50, 1.0,
+                1100, 750, 800, 60, True, 'Shot:' ))
 
     overlayTexts = None
     slateTexts = None
@@ -186,8 +240,6 @@ class SlateMaker(object):
         ''' initialize Slate Maker Action'''
         self.setSlateClip(slateClip)
         self.setItem(vtrackItem)
-        self.displayOverlayTexts = {}
-        self.displaySlateTexts = {}
 
     def setSlateClip(self, slateClip=None):
         if slateClip is None:
@@ -219,35 +271,6 @@ class SlateMaker(object):
             self.slate = None
             self.tag = None
 
-    def setDoExpandHandles(self, value):
-        self._doExpandHandles = value
-        self.updateItemTimes()
-    def getDoExpandHandles(self):
-        return self._doExpandHandles
-    doExpandHandles = property(fget=getDoExpandHandles,
-            fset=setDoExpandHandles)
-
-    def setMaxExpandHandles(self, maxHandle):
-        self._maxExpandHandles = maxHandle
-        self.updateItemTimes()
-    def getMaxExpandHandles(self):
-        return self._maxExpandHandles
-    maxExpandHandles = property(fset=setMaxExpandHandles,
-            fget=getMaxExpandHandles)
-
-    def setDoMoveUp(self, doMoveUp):
-        self._doMoveUp = doMoveUp
-    def getDoMoveUp(self):
-        return self._doMoveUp
-    doMoveUp = property(fset=setDoMoveUp,
-            fget=getDoMoveUp)
-
-    def setDoMoveOut(self, doMoveOut):
-        self._doMoveOut = doMoveOut
-    def getDoMoveOut(self):
-        return self._doMoveOut
-    doMoveOut = property(fset=setDoMoveOut,
-            fget=getDoMoveOut)
 
     def getRightItems(self, getLinkedItems=False):
         vtrack = self.vtrackItem.parentTrack()
@@ -447,28 +470,17 @@ class SlateMaker(object):
         elif not (self.handlesCollapsed or self.doExpandHandles):
             self.collapseHandles()
 
-    def calcTexts(self, defaults, display=None):
-        texts = []
-        for overlay in defaults:
-            overlay = list(overlay)
-            name = overlay[0]
-            tmp = overlay[1]
-            if display and not display.get(name, True):
-                continue
-            overlay[1] = tmp(self) if hasattr(tmp, '__call__') else tmp
-            texts.append(overlay)
-        return texts
+    def evalTexts(self, defaults):
+        return [text.eval_(self) for text in defaults if text.display]
 
-    def getSlateTexts(self, recalc=False):
-        if self.slateTexts is None or recalc:
-            self.slateTexts = self.calcTexts(self.defaultSlateTexts,
-                    self.displaySlateTexts)
+    def getSlateTexts(self, reeval=False):
+        if self.slateTexts is None or reeval:
+            self.slateTexts = self.evalTexts(self.defaultSlateTexts)
         return self.slateTexts
 
-    def getOverlayTexts(self, recalc=False):
-        if self.overlayTexts is None or recalc:
-            self.overlayTexts = self.calcTexts(self.defaultOverlayTexts,
-                    self.displayOverlayTexts)
+    def getOverlayTexts(self, reeval=False):
+        if self.overlayTexts is None or reeval:
+            self.overlayTexts = self.evalTexts(self.defaultOverlayTexts)
         return self.overlayTexts
 
     def updateSlate(self):
@@ -486,63 +498,86 @@ class SlateMaker(object):
         self.slate = Slate(self.vtrackItem, slateItem)
         return self.slate
 
-    def updateOverlayTexts(self):
+    def updateTexts(self, typ='overlay'):
         textEffects = []
         vtrack = self.vtrackItem.parentTrack()
-        existingTexts = self.slate.overlayTexts
-        for idx, data in enumerate( self.getOverlayTexts() ):
-            if existingTexts.has_key(data[0]):
-                text2 = existingTexts[data[0]]
+
+        overlay = True if typ == 'overlay' else False
+        existing = ( self.slate.overlayTexts if overlay else
+                self.slate.slateTexts )
+        incoming = ( self.getOverlayTexts() if overlay else
+                self.getSlateTexts())
+        item = self.slate.vtrackItem if overlay else self.slate.slateItem
+
+        idx = 0
+        for data in incoming:
+            label = None
+            if existing.has_key(data.name):
+                slateText = existing[data.name]
             else:
-                text2 = vtrack.createEffect(trackItem=self.vtrackItem,
+                slateText = vtrack.createEffect(trackItem=item,
                     effectType='Text2', subTrackIndex=idx)
-            SlateMaker.modifyTextEffect(text2, data)
-            textEffects.append(text2)
-        self.overlayTextEffects = textEffects
+                idx += 1
+                if data.label.strip() and self.doMakeLabels:
+                    label = vtrack.createEffect(trackItem=item,
+                            effectType='Text2', subTrackIndex=idx)
+                    idx += 1
+            SlateMaker.modifyTextEffect( slateText, data, label )
+            textEffects.append(slateText)
+
         return textEffects
+
+    def updateOverlayTexts(self):
+        self.updateTexts('overlay')
 
     def updateSlateTexts(self):
-        vtrack = self.vtrackItem.parentTrack()
-        textEffects = []
-        existingTexts = self.slate.slateTexts
-        for idx, data in enumerate( self.getSlateTexts() ):
-            if existingTexts.has_key(data[0]):
-                slateText = existingTexts[data[0]]
-            else:
-                slateText = vtrack.createEffect(trackItem=self.slate.slateItem,
-                    effectType='Text2', subTrackIndex=idx)
-            SlateMaker.modifyTextEffect( slateText, data )
-            textEffects.append(slateText)
-        return textEffects
+        self.updateTexts('slate')
 
     @staticmethod
-    def modifyTextEffect(text2, data):
-        text2.setName(data[0])
-        format = text2.sequence().format()
-        xRes = format.width()
-        yRes = format.height()
+    def modifyTextEffect(text2, data, label=None):
+        ''':type data: TextEffectData'''
+        text2.setName(data.name)
+
+        seq = text2.sequence()
+        format_ = seq.format()
+        xRes = format_.width()
+        yRes = format_.height()
 
         node = text2.node()
-        node.knob('message').setValue(data[1])
-        node.knob('font_size').setValue(data[2])
-        node.knob('opacity').setValue(data[3])
 
-        scale = xRes / float(SlateMaker.standardResolution[0])
-        xPos  = round( data[4] * scale )
-        yDiff = round( scale * ( data[5] - SlateMaker.standardResolution[1]/2 ) )
+        scaleX = xRes / float(SlateMaker.standardResolution.x)
+        scaleY = yRes / float(SlateMaker.standardResolution.y)
+        xPos  = round( data.x * scaleX )
+        yDiff = round( scaleY * ( data.y - SlateMaker.standardResolution.y/2 ) )
         yPos  = yRes/2 + yDiff
-        font_size = round(data[2] * scale)
-
-        box = node.knob('box')
-        box.setX(xPos)
-        box.setY(yPos)
-        box.setR(xPos+data[6]*scale)
-        box.setT(yPos+data[7]*scale)
-
-        font_size = reduce( lambda l,n:l+list(n),
+        font_size = round(data.font_size * scaleX)
+        font_size_values = reduce( lambda l,n:l+list(n),
                 zip(range(256),[font_size]*256), [])
-        node.knob('font_size_values').resize(len(font_size), 1)
-        node.knob('font_size_values').setValue(font_size)
+
+        node.knob('box').setX(xPos)
+        node.knob('box').setY(yPos)
+        node.knob('box').setR(xPos+data.w*scaleX)
+        node.knob('box').setT(yPos+data.h*scaleY)
+        node.knob('message').setValue(data.message)
+        node.knob('font_size').setValue(font_size)
+        node.knob('opacity').setValue(data.opacity)
+        node.knob('font_size_values').resize(len(font_size_values), 1)
+        node.knob('font_size_values').setValue(font_size_values)
+        node.knob('xjustify').setValue('left')
+        node.knob('yjustify').setValue('center')
+
+        if label:
+            label.node().knob('message').setValue(data.label)
+            label.node().knob('font_size').setValue(font_size)
+            label.node().knob('opacity').setValue(data.opacity)
+            label.node().knob('font_size_values').resize(len(font_size_values), 1)
+            label.node().knob('font_size_values').setValue(font_size_values)
+            label.node().knob('xjustify').setValue('right')
+            label.node().knob('yjustify').setValue('center')
+            label.node().knob('box').setX(xPos - 650 * scaleX)
+            label.node().knob('box').setY(yPos)
+            label.node().knob('box').setR(xPos - 50  * scaleX)
+            label.node().knob('box').setT(yPos + data.h * scaleY)
 
     @staticmethod
     def detectSlateClips():
@@ -589,10 +624,16 @@ class SlateMaker(object):
 
         self.doMoveOut = settings.doMoveOut
         self.doMoveUp = settings.doMoveUp
-        self.displayOverlayTexts = settings.displayOverlayTexts
-        self.displaySlateTexts = settings.displaySlateTexts
         self.doExpandHandles = settings.doExpandHandles
         self.maxExpandHandles = settings.maxExpandHandles
+        self.doMakeLabels = settings.doMakeLabels
+
+        self.defaultOverlayTexts = [
+                text.setDisplay(settings.displayOverlayTexts.get(text.name,
+                    True)) for text in self.defaultOverlayTexts]
+        self.defaultSlateTexts = [
+                text.setDisplay(settings.displaySlateTexts.get(text.name,
+                    True)) for text in self.defaultSlateTexts]
 
 
     def printItemTimes(self):
