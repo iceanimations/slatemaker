@@ -171,6 +171,8 @@ class TextEffectData(namedtuple('_TextEffectData', [
         data[8] = display
         return TextEffectData(*data)
 
+my_inst = None
+
 class SlateMakerOption(object):
     '''SlateMakerOption as a descriptor, cuz they are awesome'''
 
@@ -186,6 +188,9 @@ class SlateMakerOption(object):
 
     def __set__(self, instance, value ):
         setattr(instance, '_' + self.name, value)
+        print 'set', '_' + self.name, value, getattr(instance, '_' + self.name)
+        global my_inst
+        my_inst = instance
 
 Resolution = namedtuple('Resolution', ['x', 'y'])
 
@@ -194,7 +199,7 @@ class SlateMaker(object):
     doExpandHandles = SlateMakerOption('doExpandHandles', True)
     maxExpandHandles = SlateMakerOption('maxExpandHandles', 6)
     doMoveUp = SlateMakerOption('doMoveUp', False)
-    doMoveOut = SlateMakerOption('doMoveOut', False)
+    doMoveOut = SlateMakerOption('doMoveOut', True)
     doMakeLabels = SlateMakerOption('doMakeLabels', True)
 
     # defaults
@@ -341,11 +346,13 @@ class SlateMaker(object):
             self._moveUp = False
 
             if self.doMoveUp and (left or self._move or self._push):
+                print 'move up'
                 self._moveUp = True
                 self._move = 0
                 self._push = 0
 
             if self.doMoveOut:
+                print 'move out'
                 self._moveUp = False
                 self._moveOut = True
                 self._move = 0
@@ -634,6 +641,8 @@ class SlateMaker(object):
         self.defaultSlateTexts = [
                 text.setDisplay(settings.displaySlateTexts.get(text.name,
                     True)) for text in self.defaultSlateTexts]
+
+        self.setItem(self.vtrackItem)
 
 
     def printItemTimes(self):
