@@ -171,8 +171,6 @@ class TextEffectData(namedtuple('_TextEffectData', [
         data[8] = display
         return TextEffectData(*data)
 
-my_inst = None
-
 class SlateMakerOption(object):
     '''SlateMakerOption as a descriptor, cuz they are awesome'''
 
@@ -188,9 +186,6 @@ class SlateMakerOption(object):
 
     def __set__(self, instance, value ):
         setattr(instance, '_' + self.name, value)
-        print 'set', '_' + self.name, value, getattr(instance, '_' + self.name)
-        global my_inst
-        my_inst = instance
 
 Resolution = namedtuple('Resolution', ['x', 'y'])
 
