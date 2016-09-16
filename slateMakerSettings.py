@@ -13,6 +13,7 @@ class Setting(object):
         instance.setValue(self.keystring, json.dumps(value))
 
 class SlateMakerSettings(core.QSettings):
+    ''' Class for accessing all Settings of the slateMaker'''
 
     doMoveOut = Setting('doMoveOut', True)
     doMoveUp = Setting('doMoveUp', False)
@@ -20,6 +21,9 @@ class SlateMakerSettings(core.QSettings):
     displaySlateTexts = Setting('displaySlateTexts', {})
     doExpandHandles = Setting('doExpandHandles', True)
     maxExpandHandles = Setting('maxExpandHandles', 6)
+    overlayTexts = Setting('overlayTexts', ())
+    slateTexts = Setting('slateTexts', ())
+    doMakeLabels = Setting('doMakeLabels', True)
 
     def __init__(self, organization='ICE Animations', product='SlateMaker'):
         super(SlateMakerSettings, self).__init__(organization, product)

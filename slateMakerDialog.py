@@ -7,6 +7,7 @@ reload(slateMaker)
 from .slateMaker import SlateMaker
 from .slateMakerSettings import SlateMakerSettings
 
+
 class SlateMakerDialog(gui.QDialog):
     ''' The SlateMaker Options Dialog '''
     settings = SlateMakerSettings()
@@ -40,6 +41,16 @@ class SlateMakerDialog(gui.QDialog):
                 checked=not (self.settings.doMoveOut or
                     self.settings.doMoveUp), radio=True,
                 layout=self.moveLayout)
+
+        self.showLabelsFrame = gui.QFrame()
+        self.showLabelsLayout = gui.QVBoxLayout()
+        self.showLabelsFrame.setLayout(self.showLabelsLayout)
+        self.showLabelsLayout.addWidget(gui.QLabel('Labels:'))
+        self.doMakeLabelsCheck = self.addCheckBox('Make Labels',
+                checked=self.settings.doMakeLabels,
+                layout=self.showLabelsLayout)
+        self.showLabelsLayout.addWidget(self.doMakeLabelsCheck)
+        self.layout.addWidget(self.showLabelsFrame)
 
         self.expandFrame = gui.QFrame()
         self.expandLayout = gui.QVBoxLayout()
@@ -109,6 +120,7 @@ class SlateMakerDialog(gui.QDialog):
                 check in self.slateChecks}
         self.settings.displayOverlayTexts = {check.text(): check.isChecked() for
                 check in self.overlayChecks}
+        self.settings.doMakeLabels = self.doMakeLabelsCheck.isChecked()
         self.accept()
 
     def apply(self, *args):
