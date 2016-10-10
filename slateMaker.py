@@ -445,6 +445,7 @@ class SlateMaker(object):
             vtrack.removeItem(self.vtrackItem)
             new_track.addItem(self.vtrackItem)
             self.moveItem(self._move)
+            self._move = 0
             sequence.addTrack(new_track)
             self._moveUp = False
 
@@ -468,10 +469,10 @@ class SlateMaker(object):
         newTrackItem.setSourceOut(self.vtrackItem.sourceOut())
         newTrackItem.setTimelineOut(self.vtrackItem.timelineOut()+self._move)
 
-        print newTrackItem.timelineIn()+self._trimIn-1, self._move
         newSeq.setInTime(newTrackItem.timelineIn()+self._trimIn-1)
         newSeq.setOutTime(newTrackItem.timelineOut()-self._trimOut)
 
+        self._move = 0
         return newTrackItem
 
     def updateHandles(self):
