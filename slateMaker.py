@@ -2,7 +2,6 @@ import hiero.core as hcore
 import json
 from collections import namedtuple
 import re
-import sys
 
 from .slateMakerSettings import SlateMakerSettings
 
@@ -327,9 +326,14 @@ class SlateMaker(object):
 
             self._move = 0
             slateIn = timelineIn + self._trimIn - 1
+            negativeSlate = False
+            if slateIn < 0:
+                negativeSlate = True
             left = self.getItemToTheLeft()
             if ( left and left.timelineOut() > slateIn ):
                 self._move = left.timelineOut() - slateIn + 1
+            if negativeSlate:
+                self._move += -1 * slateIn
 
             self._push = 0
             out = timelineOut - self._trimOut
@@ -341,16 +345,18 @@ class SlateMaker(object):
             self._moveUp = False
 
             if self.doMoveUp and (left or self._move or self._push):
-                print 'move up'
                 self._moveUp = True
                 self._move = 0
+                if negativeSlate:
+                    self._move = -1 * slateIn
                 self._push = 0
 
             if self.doMoveOut:
-                print 'move out'
                 self._moveUp = False
                 self._moveOut = True
                 self._move = 0
+                if negativeSlate:
+                    self._move = -1 * slateIn
                 self._push = 0
 
     def moveItem(self, push):
@@ -438,6 +444,7 @@ class SlateMaker(object):
             new_track = hcore.VideoTrack(self.vtrackItem.name())
             vtrack.removeItem(self.vtrackItem)
             new_track.addItem(self.vtrackItem)
+            self.moveItem(self._move)
             sequence.addTrack(new_track)
             self._moveUp = False
 
@@ -447,7 +454,7 @@ class SlateMaker(object):
 
     def createTrackItemInNewSequence(self):
         clip = self.vtrackItem.source()
-        position = self.vtrackItem.timelineIn()
+        position = self.vtrackItem.timelineIn()+self._move
 
         project = hcore.projects()[-1]
         newSeq = hcore.Sequence(self.vtrackItem.currentVersion().name())
@@ -456,11 +463,12 @@ class SlateMaker(object):
         newSeq.addTrack(newVideoTrack)
 
         newTrackItem = newVideoTrack.addTrackItem(clip, position)
-        newTrackItem.setTimelineIn(self.vtrackItem.timelineIn())
+        newTrackItem.setTimelineIn(self.vtrackItem.timelineIn()+self._move)
         newTrackItem.setSourceIn(self.vtrackItem.sourceIn())
         newTrackItem.setSourceOut(self.vtrackItem.sourceOut())
-        newTrackItem.setTimelineOut(self.vtrackItem.timelineOut())
+        newTrackItem.setTimelineOut(self.vtrackItem.timelineOut()+self._move)
 
+        print newTrackItem.timelineIn()+self._trimIn-1, self._move
         newSeq.setInTime(newTrackItem.timelineIn()+self._trimIn-1)
         newSeq.setOutTime(newTrackItem.timelineOut()-self._trimOut)
 
